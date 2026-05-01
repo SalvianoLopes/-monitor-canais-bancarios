@@ -513,8 +513,8 @@ tr:hover td{background:#fafaf8}
 
 <script>
 /* ══ SUPABASE ══ */
-const SB_URL='https://yaaoisqyxfqocrnlymjm.supabase.co';
-const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhYW9pc3F5eGZxb2Nybmx5bWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NjkxNjYsImV4cCI6MjA4NjQ0NTE2Nn0.GffNyO_nYJZKkACJsaX2AuHOkh0kOa58-b3fnMgaixg';
+const SB_URL='';
+const SB_KEY='';
 const H={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`};
 const sbGet=(t,p='')=>{
   const c=new AbortController();
@@ -570,6 +570,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
 
 async function carregarDados(){
   try{
+    // MODO DEMO: sem credenciais, dados do banco não carregados
+    if(!SB_URL || !SB_KEY) { console.log('Modo demo: banco desabilitado'); return; }
     // Paginação: Supabase limita 1000 linhas por request
     // Busca em páginas de 1000 até trazer tudo
     const SELECT = 'id,canal,data_ref,inserted_date,numero,demandante,cpf,abertura,prazo,demanda,status,safra,extra1,extra2,descricao,colaborador';
