@@ -1,0 +1,1837 @@
+﻿<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Plataforma de Gestão de Demandas — Setor Bancário</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --ink:#0e0f11;--ink2:#4a4d55;--ink3:#9699a3;--ink4:#c8cad0;
+  --paper:#f4f3f0;--surface:#fff;--border:rgba(14,15,17,.08);--border2:rgba(14,15,17,.14);
+  --rdr:#1a56db;--rdr-bg:#eff4ff;
+  --cons:#0b7a5e;--cons-bg:#ecfdf5;
+  --proc:#7c3aed;--proc-bg:#f5f3ff;
+  --danger:#c0392b;--danger-bg:#fff1f0;
+  --warn:#b45309;--warn-bg:#fffbeb;
+  --ok:#166534;--ok-bg:#f0fdf4;
+  --r:8px;--rl:12px;
+}
+html,body{height:100%}
+body{font-family:'DM Sans',sans-serif;background:var(--paper);color:var(--ink);font-size:13px;line-height:1.5;display:flex;flex-direction:column}
+
+/* HEADER */
+.hdr{background:var(--surface);border-bottom:1px solid var(--border);padding:0 20px;height:48px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:60}
+.hbrand{display:flex;align-items:center;gap:9px}
+.hmark{width:26px;height:26px;background:var(--ink);border-radius:6px;display:flex;align-items:center;justify-content:center}
+.hmark svg{width:12px;height:12px;fill:#fff}
+.htitle{font-size:13px;font-weight:600;letter-spacing:-.3px}
+.hchips{display:flex;gap:6px}
+.chip{font-family:'DM Mono',monospace;font-size:10px;padding:3px 8px;border-radius:5px;border:1px solid var(--border2);color:var(--ink2)}
+.chip.rdr{background:var(--rdr-bg);color:var(--rdr);border-color:rgba(26,86,219,.15)}
+.chip.cons{background:var(--cons-bg);color:var(--cons);border-color:rgba(11,122,94,.15)}
+.chip.proc{background:var(--proc-bg);color:var(--proc);border-color:rgba(124,58,237,.15)}
+
+/* TOAST */
+.toast{position:fixed;bottom:18px;right:18px;font-size:11px;font-weight:600;padding:9px 14px;border-radius:8px;z-index:999;display:none;gap:6px;align-items:center;background:var(--ink);color:#fff;max-width:280px}
+.toast.show{display:flex}
+.toast.ok{background:var(--ok)}
+.toast.err{background:var(--danger)}
+
+/* LAYOUT */
+.wrap{display:flex;flex:1;overflow:hidden;height:calc(100vh - 48px)}
+
+/* ═══ SIDEBAR ESQUERDA: CALENDÁRIO ═══ */
+.sidebar{width:256px;flex-shrink:0;border-right:1px solid var(--border);background:var(--surface);display:flex;flex-direction:column;overflow:hidden}
+.cal-hd{padding:12px 14px 8px;flex-shrink:0}
+.cal-nav{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.cal-nb{background:none;border:none;cursor:pointer;width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;color:var(--ink2);font-size:13px;transition:background .12s}
+.cal-nb:hover{background:var(--paper)}
+.cal-ml{font-size:12px;font-weight:600}
+.cal-dows{display:grid;grid-template-columns:repeat(7,1fr);gap:0}
+.cal-dow{text-align:center;font-size:9px;font-weight:600;color:var(--ink3);text-transform:uppercase;padding:2px 0;letter-spacing:.2px}
+.cal-bd{padding:0 10px 10px;flex:1;overflow-y:auto}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:1px;margin-top:3px}
+.cd{aspect-ratio:1;border-radius:5px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:11px;font-weight:500;color:var(--ink3);position:relative;gap:1px;transition:all .1s}
+.cd.util{cursor:pointer;color:var(--ink2)}
+.cd.util:hover{background:var(--paper)}
+.cd.hoje{background:var(--paper);font-weight:700;color:var(--ink)}
+.cd.sel{background:var(--ink)!important;color:#fff!important}
+.cd.feriado,.cd.wknd{color:var(--ink4)}
+.cd.tem{color:var(--ink);font-weight:600}
+.cdots{display:flex;gap:2px;justify-content:center}
+.cdot{width:3px;height:3px;border-radius:50%}
+.cdot.rdr{background:var(--rdr)}
+.cdot.cons{background:var(--cons)}
+.cdot.proc{background:var(--proc)}
+.cal-leg{padding:8px 14px;border-top:1px solid var(--border);display:flex;flex-wrap:wrap;gap:6px;flex-shrink:0}
+.leg{display:flex;align-items:center;gap:3px;font-size:9px;color:var(--ink3)}
+.ldot{width:5px;height:5px;border-radius:50%}
+
+/* SOMATÓRIA (abaixo calendário) */
+.sum-box{border-top:1px solid var(--border);padding:12px 14px;flex-shrink:0}
+.sum-title{font-size:9px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+.sum-canais{display:flex;flex-direction:column;gap:6px}
+.sum-row{display:flex;align-items:center;justify-content:space-between}
+.sum-lbl{font-size:11px;display:flex;align-items:center;gap:5px}
+.sum-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.sum-num{font-size:15px;font-weight:600}
+.sum-num.rdr{color:var(--rdr)}
+.sum-num.cons{color:var(--cons)}
+.sum-num.proc{color:var(--proc)}
+.sum-total-row{display:flex;align-items:center;justify-content:space-between;padding-top:6px;margin-top:4px;border-top:1px solid var(--border)}
+.sum-total-num{font-size:20px;font-weight:700;color:var(--ink)}
+
+.sum-pendente{font-size:9px;font-weight:600;color:var(--warn);background:var(--warn-bg);
+  border:1px solid rgba(180,83,9,.15);padding:1px 5px;border-radius:3px;margin-left:4px}
+
+
+/* ═══ ÁREA PRINCIPAL ═══ */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+
+/* upload bar compacta */
+.upload-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;flex-shrink:0;display:none}
+.upload-bar.show{display:block}
+.ubar-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.ubar-day{font-size:13px;font-weight:600;color:var(--ink)}
+.ubar-sub{font-size:10px;color:var(--ink3);margin-top:1px}
+.btn-salvar{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;padding:6px 14px;background:var(--ink);color:#fff;border:none;border-radius:7px;cursor:pointer;opacity:.35;pointer-events:none;white-space:nowrap}
+.btn-salvar.ready{opacity:1;pointer-events:all}
+.btn-salvar.loading{opacity:.6;cursor:wait}
+.slots-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.slot-mini{border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;display:flex;align-items:center;gap:8px;background:var(--surface)}
+.slot-mini input{display:none}
+.sm-ico{width:28px;height:28px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0}
+.slot-mini.rdr .sm-ico{background:var(--rdr-bg)}
+.slot-mini.consumidor .sm-ico{background:var(--cons-bg)}
+.slot-mini.procon .sm-ico{background:var(--proc-bg)}
+.sm-info{flex:1;min-width:0}
+.sm-name{font-size:11px;font-weight:600}
+.slot-mini.rdr .sm-name{color:var(--rdr)}
+.slot-mini.consumidor .sm-name{color:var(--cons)}
+.slot-mini.procon .sm-name{color:var(--proc)}
+.sm-st{font-size:9px;color:var(--ink3);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sm-st.ok{color:var(--ok);font-weight:500}
+.btn-anx{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;padding:4px 10px;border:none;border-radius:5px;cursor:pointer;white-space:nowrap;flex-shrink:0}
+.slot-mini.rdr .btn-anx{background:var(--rdr-bg);color:var(--rdr)}
+.slot-mini.consumidor .btn-anx{background:var(--cons-bg);color:var(--cons)}
+.slot-mini.procon .btn-anx{background:var(--proc-bg);color:var(--proc)}
+.btn-anx.ok{background:var(--ok-bg);color:var(--ok)}
+.btn-rm{background:var(--paper);border:1px solid var(--border2);cursor:not-allowed;color:var(--ink4);font-size:12px;font-weight:700;width:28px;height:28px;border-radius:6px;line-height:1;flex-shrink:0;transition:all .15s;display:flex;align-items:center;justify-content:center}
+.btn-rm.show{background:var(--danger-bg);border-color:rgba(192,57,43,.25);color:var(--danger);cursor:pointer}
+.btn-rm.show:hover{background:var(--danger);color:#fff}
+
+/* painel de dados */
+.data-area{flex:1;overflow-y:auto;padding:16px 20px}
+
+/* estado vazio */
+.data-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;color:var(--ink3)}
+.data-empty .ei{font-size:40px;opacity:.3}
+.data-empty p{font-size:12px;max-width:220px;text-align:center;line-height:1.7}
+
+/* KPIs do dia */
+.kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:11px 13px}
+.kpi-lbl{font-size:9px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.kpi-val{font-size:26px;font-weight:600;line-height:1}
+.kpi-sub{font-size:9px;color:var(--ink3);margin-top:2px}
+.kpi-val.rdr{color:var(--rdr)}
+.kpi-val.cons{color:var(--cons)}
+.kpi-val.proc{color:var(--proc)}
+.kpi-val.warn{color:var(--warn)}
+.kpi-val.danger{color:var(--danger)}
+.kpi-val.ok{color:var(--ok)}
+
+/* tabs canais */
+.ctabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:14px}
+.ctab{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;padding:7px 14px;border:none;background:none;color:var(--ink3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;display:flex;align-items:center;gap:5px;transition:all .12s}
+.ctab:hover{color:var(--ink2)}
+.ctab.active{color:var(--ink);border-bottom-color:var(--ink)}
+.ctab .pip{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.ctab[data-c=rdr] .pip{background:var(--rdr)}
+.ctab[data-c=consumidor] .pip{background:var(--cons)}
+.ctab[data-c=procon] .pip{background:var(--proc)}
+.cpanel{display:none}
+.cpanel.active{display:block}
+
+/* canal zerado */
+.canal-zero{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:28px;text-align:center;color:var(--ink3)}
+.canal-zero .zi{font-size:24px;margin-bottom:6px;opacity:.4}
+.canal-zero p{font-size:11px}
+
+/* alert */
+.alert{border-radius:7px;padding:8px 12px;margin-bottom:10px;font-size:11px;font-weight:500;display:flex;align-items:center;gap:6px}
+.alert.danger{background:var(--danger-bg);color:var(--danger)}
+.alert.warn{background:var(--warn-bg);color:var(--warn)}
+
+/* canal KPIs */
+.ckpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:12px}
+
+/* chart grid */
+.cg2{display:grid;grid-template-columns:3fr 2fr;gap:10px;margin-bottom:10px}
+.cg3{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.card-t{font-size:9px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+
+/* prazo list */
+.pl-row{display:flex;align-items:center;gap:6px;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px}
+.pl-row:last-child{border-bottom:none}
+.pl-nome{flex:1;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pl-data{font-size:9px;color:var(--ink3);font-family:'DM Mono',monospace;white-space:nowrap}
+.badge{font-size:9px;font-weight:600;padding:2px 5px;border-radius:3px;white-space:nowrap}
+.badge.v{background:var(--danger-bg);color:var(--danger)}
+.badge.u{background:var(--warn-bg);color:var(--warn)}
+.badge.o{background:var(--ok-bg);color:var(--ok)}
+
+/* tabela */
+.twrap{overflow-x:auto;max-height:260px;overflow-y:auto}
+table{width:100%;border-collapse:collapse;font-size:11px}
+th{background:var(--paper);color:var(--ink3);font-weight:600;font-size:9px;text-transform:uppercase;letter-spacing:.4px;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);position:sticky;top:0;z-index:2;white-space:nowrap}
+td{padding:6px 8px;border-bottom:1px solid var(--border);color:var(--ink);white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis}
+tr:hover td{background:#fafaf8}
+.dtag{display:inline-block;padding:2px 5px;border-radius:3px;font-size:9px;font-weight:600}
+
+
+/* BOTÃO EXCLUIR CANAL */
+.btn-excluir-canal{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;padding:4px 10px;background:var(--danger-bg);color:var(--danger);border:1px solid rgba(192,57,43,.2);border-radius:5px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px}
+.btn-excluir-canal:hover{background:var(--danger);color:#fff}
+
+/* MODAL CONFIRMAÇÃO */
+.modal-overlay{position:fixed;inset:0;background:rgba(14,15,17,.4);z-index:200;display:none;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal-box{background:var(--surface);border-radius:var(--rl);padding:24px 28px;width:340px;box-shadow:0 8px 32px rgba(0,0,0,.12)}
+.modal-box h3{font-size:14px;font-weight:600;margin-bottom:6px}
+.modal-box p{font-size:12px;color:var(--ink2);margin-bottom:18px;line-height:1.6}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end}
+.modal-actions button{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;padding:7px 16px;border-radius:7px;cursor:pointer;border:none}
+.btn-modal-cancel{background:var(--paper);color:var(--ink2);border:1px solid var(--border2)!important}
+.btn-modal-confirm{background:var(--danger);color:#fff}
+.btn-modal-confirm:hover{background:#a93226}
+
+/* ABA VISÃO GERAL */
+.vg-btn:hover{color:var(--ink2)}
+.vg-btn.active{color:var(--ink);border-bottom-color:var(--ink)}
+
+/* SCORE CARD */
+.score-wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.score-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.score-top{display:flex;align-items:center;justify-content:space-between}
+.score-label{font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px}
+.score-pct{font-size:22px;font-weight:700;line-height:1}
+.score-bar-wrap{height:4px;background:var(--paper);border-radius:2px;overflow:hidden}
+.score-bar{height:100%;border-radius:2px;transition:width .5s}
+.score-desc{font-size:10px;color:var(--ink3);margin-top:2px}
+.score-pct.verde{color:var(--ok)}
+.score-pct.amarelo{color:var(--warn)}
+.score-pct.vermelho{color:var(--danger)}
+
+/* INDICADORES */
+.ind-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+.ind-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
+.ind-title{font-size:9px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+.ind-row{display:flex;align-items:center;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border);font-size:11px}
+.ind-row:last-child{border-bottom:none}
+.ind-lbl{color:var(--ink2);flex:1}
+.ind-val{font-weight:600;color:var(--ink)}
+.ind-badge{font-size:9px;font-weight:600;padding:2px 6px;border-radius:3px}
+.ind-badge.ok{background:var(--ok-bg);color:var(--ok)}
+.ind-badge.warn{background:var(--warn-bg);color:var(--warn)}
+.ind-badge.danger{background:var(--danger-bg);color:var(--danger)}
+
+/* STATUS CANAIS */
+.canal-status-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px}
+.canal-status-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:12px 14px}
+.cs-header{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+.cs-dot{width:7px;height:7px;border-radius:50%}
+.cs-name{font-size:11px;font-weight:600}
+.cs-name.rdr{color:var(--rdr)}.cs-name.cons{color:var(--cons)}.cs-name.proc{color:var(--proc)}
+.cs-big{font-size:28px;font-weight:700;line-height:1;margin-bottom:2px}
+.cs-big.rdr{color:var(--rdr)}.cs-big.cons{color:var(--cons)}.cs-big.proc{color:var(--proc)}
+.cs-pct{font-size:11px;font-weight:500}
+.cs-pct.ok{color:var(--ok)}.cs-pct.warn{color:var(--warn)}.cs-pct.danger{color:var(--danger)}
+.cs-sub{font-size:9px;color:var(--ink3);margin-top:3px}
+
+/* PAINEL GERAL */
+.pg-btn{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;padding:5px 12px;
+  background:var(--paper);border:1px solid var(--border2);border-radius:7px;cursor:pointer;
+  color:var(--ink2);transition:all .15s;display:flex;align-items:center;gap:5px}
+.pg-btn:hover{background:var(--ink);color:#fff}
+.pg-btn.ativo{background:var(--ink);color:#fff;border-color:var(--ink)}
+.pg-overlay{position:fixed;inset:0;background:rgba(14,15,17,.5);z-index:150;display:none;align-items:flex-start;justify-content:flex-end}
+.pg-overlay.show{display:flex}
+.pg-panel{background:var(--surface);width:520px;height:100%;overflow-y:auto;padding:24px;box-shadow:-4px 0 24px rgba(0,0,0,.12)}
+.pg-panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
+.pg-panel-head h2{font-size:16px;font-weight:600}
+.pg-close{background:none;border:none;cursor:pointer;font-size:18px;color:var(--ink3);padding:4px;border-radius:5px}
+.pg-close:hover{color:var(--ink);background:var(--paper)}
+.pg-section{margin-bottom:20px}
+.pg-section-title{font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.7px;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.ind-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px}
+.ind-card{background:var(--paper);border-radius:var(--r);padding:12px 14px}
+.ind-lbl{font-size:9px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px}
+.ind-val{font-size:22px;font-weight:600;color:var(--ink);line-height:1}
+.ind-sub{font-size:10px;color:var(--ink3);margin-top:2px}
+.ind-val.ok{color:var(--ok)}
+.ind-val.warn{color:var(--warn)}
+.ind-val.danger{color:var(--danger)}
+.ind-val.rdr{color:var(--rdr)}
+.ind-val.cons{color:var(--cons)}
+.ind-val.proc{color:var(--proc)}
+.barra-wrap{margin-bottom:10px}
+.barra-lbl{display:flex;justify-content:space-between;font-size:10px;color:var(--ink2);margin-bottom:4px;font-weight:500}
+.barra-bg{height:7px;background:var(--paper);border-radius:4px;overflow:hidden}
+.barra-fill{height:100%;border-radius:4px;transition:width .4s ease}
+.saude-item{display:flex;align-items:center;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:11px}
+.saude-item:last-child{border-bottom:none}
+.saude-lbl{display:flex;align-items:center;gap:6px;color:var(--ink2)}
+.saude-ico{font-size:13px}
+.saude-badge{font-size:10px;font-weight:600;padding:2px 8px;border-radius:4px}
+.saude-badge.ok{background:var(--ok-bg);color:var(--ok)}
+.saude-badge.warn{background:var(--warn-bg);color:var(--warn)}
+.saude-badge.danger{background:var(--danger-bg);color:var(--danger)}
+.dem-row{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11px}
+.dem-nome{width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink2)}
+.dem-barra{flex:1;height:6px;background:var(--paper);border-radius:3px;overflow:hidden}
+.dem-fill{height:100%;border-radius:3px;background:var(--rdr)}
+.dem-num{font-size:10px;font-weight:600;color:var(--ink);min-width:24px;text-align:right}
+
+/* BUSCA POR CLIENTE */
+.busca-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:8px 20px;flex-shrink:0;display:flex;align-items:center;gap:8px}
+.busca-input{flex:1;padding:7px 12px;border:1px solid var(--border2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;outline:none;transition:border-color .15s}
+.busca-input:focus{border-color:var(--rdr)}
+.busca-btn-clear{background:none;border:none;cursor:pointer;color:var(--ink3);font-size:14px;padding:4px;border-radius:5px}
+.busca-btn-clear:hover{color:var(--danger);background:var(--danger-bg)}
+
+/* MODAL DE BUSCA */
+/* busca-overlay removido */
+.busca-modal{background:var(--surface);border-radius:var(--rl);width:700px;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 8px 40px rgba(0,0,0,.15)}
+.busca-modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.busca-modal-head h3{font-size:14px;font-weight:600}
+.busca-modal-body{flex:1;overflow-y:auto;padding:16px 20px}
+.busca-res-item{background:var(--paper);border-radius:var(--r);padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all .12s;border:1px solid transparent}
+.busca-res-item:hover{border-color:var(--rdr);background:var(--rdr-bg)}
+.bri-nome{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:4px}
+.bri-meta{font-size:11px;color:var(--ink3);display:flex;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.bri-canal{display:inline-flex;align-items:center;gap:4px;padding:2px 7px;border-radius:4px;font-size:10px;font-weight:600}
+.bri-canal.rdr{background:var(--rdr-bg);color:var(--rdr)}
+.bri-canal.consumidor{background:var(--cons-bg);color:var(--cons)}
+.bri-canal.procon{background:var(--proc-bg);color:var(--proc)}
+
+/* FICHA DO CLIENTE */
+.ficha-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:12px}
+.ficha-field{background:var(--paper);border-radius:6px;padding:8px 10px}
+.ficha-lbl{font-size:9px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px}
+.ficha-val{font-size:11px;font-weight:500;color:var(--ink);word-break:break-word}
+.ficha-full{grid-column:1/-1}
+.btn-voltar{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:500;padding:5px 12px;background:none;border:1px solid var(--border2);border-radius:6px;cursor:pointer;color:var(--ink2);margin-bottom:12px}
+.btn-voltar:hover{background:var(--paper)}
+.busca-nada{text-align:center;padding:32px;color:var(--ink3);font-size:12px}
+
+/* BUSCA POR CLIENTE */
+.busca-wrap{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 20px;flex-shrink:0;display:none;position:relative;z-index:100}
+.busca-wrap.show{display:block}
+.busca-inner{display:flex;align-items:center;gap:10px}
+.busca-input{flex:1;padding:8px 12px;border:1px solid var(--border2);border-radius:8px;font-family:'DM Sans',sans-serif;font-size:12px;outline:none;transition:border-color .15s}
+.busca-input:focus{border-color:var(--rdr)}
+.busca-count{font-size:11px;color:var(--ink3);white-space:nowrap}
+.btn-busca-close{background:none;border:none;cursor:pointer;font-size:14px;color:var(--ink3);padding:4px 6px;border-radius:5px}
+.btn-busca-close:hover{color:var(--danger);background:var(--danger-bg)}
+
+/* CARD CLIENTE */
+.cliente-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);margin-bottom:10px;overflow:hidden}
+.cc-header{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:var(--paper);border-bottom:1px solid var(--border)}
+.cc-nome{font-size:13px;font-weight:600;color:var(--ink)}
+.cc-canal{font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px}
+.cc-canal.rdr{background:var(--rdr-bg);color:var(--rdr)}
+.cc-canal.consumidor{background:var(--cons-bg);color:var(--cons)}
+.cc-canal.procon{background:var(--proc-bg);color:var(--proc)}
+.cc-body{padding:12px 16px;display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.cc-field{font-size:11px}
+.cc-label{font-size:9px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:2px}
+.cc-val{color:var(--ink);word-break:break-word}
+.cc-val.destaque{color:var(--rdr);font-weight:600}
+.cc-extra{padding:0 16px 12px;border-top:0.5px solid var(--border);padding-top:10px;margin-top:0}
+.cc-sit{font-size:10px;color:var(--ink2);line-height:1.5;background:var(--paper);padding:6px 10px;border-radius:5px;white-space:pre-line}
+::-webkit-scrollbar{width:4px;height:4px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
+
+@media(max-width:900px){
+  .kpi-row,.ckpi-row{grid-template-columns:repeat(2,1fr)}
+  .cg2,.cg3{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hbrand">
+    <div class="hmark"><svg viewBox="0 0 16 16"><path d="M2 3h12v2H2zm0 4h8v2H2zm0 4h10v2H2z"/></svg></div>
+    <div class="htitle">Plataforma de Gestão de Demandas</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="display:flex;align-items:center;gap:10px">
+    <button class="pg-btn" id="pg-btn" onclick="togglePainelGeral()">📊 Visão Geral</button>
+    <button class="pg-btn" id="btn-busca" onclick="toggleBusca()" style="margin-left:4px">🔍 Buscar cliente</button>
+    <div class="hchips">
+      <span class="chip rdr" id="chip-rdr">RDR 0</span>
+      <span class="chip cons" id="chip-cons">Consumidor 0</span>
+      <span class="chip proc" id="chip-proc">PROCON 0</span>
+    </div>
+  </div>
+</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- BUSCA POR CLIENTE -->
+<div class="busca-wrap" id="busca-wrap">
+  <div class="busca-inner">
+    <input class="busca-input" id="busca-input" type="text" placeholder="Digite o nome, CPF ou protocolo…"
+      oninput="buscaDigitando(this.value)"
+      onkeydown="if(event.key==='Enter')executarBusca(this.value)">
+    <button onclick="executarBusca(document.getElementById('busca-input').value)"
+      style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;padding:6px 14px;background:var(--rdr);color:#fff;border:none;border-radius:7px;cursor:pointer;flex-shrink:0">
+      🔍 Buscar
+    </button>
+    <span class="busca-count" id="busca-count"></span>
+    <button class="btn-busca-close" onclick="toggleBusca()">✕ Fechar</button>
+  </div>
+  <div id="busca-results" style="
+    position:absolute;top:100%;left:0;right:0;z-index:150;
+    background:var(--surface);border-bottom:2px solid var(--border);
+    box-shadow:0 8px 24px rgba(0,0,0,.12);
+    max-height:65vh;overflow-y:auto;padding:12px 20px;
+    display:none;
+  "></div>
+</div>
+
+<div class="wrap">
+
+  <!-- ═══ SIDEBAR: CALENDÁRIO + SOMATÓRIA ═══ -->
+  <div class="sidebar">
+    <div class="cal-hd">
+      <div class="cal-nav">
+        <button class="cal-nb" onclick="mudarMes(-1)">‹</button>
+        <span class="cal-ml" id="cal-ml">—</span>
+        <button class="cal-nb" onclick="mudarMes(1)">›</button>
+      </div>
+      <div class="cal-dows">
+        <div class="cal-dow">D</div><div class="cal-dow">S</div><div class="cal-dow">T</div>
+        <div class="cal-dow">Q</div><div class="cal-dow">Q</div><div class="cal-dow">S</div><div class="cal-dow">S</div>
+      </div>
+    </div>
+    <div class="cal-bd"><div class="cal-grid" id="cal-grid"></div></div>
+    <div class="cal-leg">
+      <div class="leg"><div class="ldot" style="background:var(--rdr)"></div>RDR</div>
+      <div class="leg"><div class="ldot" style="background:var(--cons)"></div>Consumidor</div>
+      <div class="leg"><div class="ldot" style="background:var(--proc)"></div>PROCON</div>
+    </div>
+    <div class="sum-box">
+      <div class="sum-title">Total acumulado</div>
+      <div class="sum-canais">
+        <div class="sum-row">
+          <div class="sum-lbl"><div class="sum-dot" style="background:var(--rdr)"></div>RDR — BACEN</div>
+          <div style="display:flex;align-items:center"><div class="sum-num rdr" id="sum-rdr">0</div><span class="sum-pendente" id="pend-rdr" style="display:none"></span></div>
+        </div>
+        <div class="sum-row">
+          <div class="sum-lbl"><div class="sum-dot" style="background:var(--cons)"></div>Consumidor.gov</div>
+          <div style="display:flex;align-items:center"><div class="sum-num cons" id="sum-cons">0</div><span class="sum-pendente" id="pend-cons" style="display:none"></span></div>
+        </div>
+        <div class="sum-row">
+          <div class="sum-lbl"><div class="sum-dot" style="background:var(--proc)"></div>PROCON</div>
+          <div style="display:flex;align-items:center"><div class="sum-num proc" id="sum-proc">0</div><span class="sum-pendente" id="pend-proc" style="display:none"></span></div>
+        </div>
+        <div class="sum-total-row">
+          <div class="sum-lbl" style="font-weight:600;color:var(--ink)">Total geral</div>
+          <div class="sum-total-num" id="sum-total">0</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══ ÁREA PRINCIPAL ═══ -->
+  <div class="main">
+
+    <!-- Upload bar compacta -->
+    <div class="upload-bar" id="upload-bar">
+      <div class="ubar-head">
+        <div>
+          <div class="ubar-day" id="ubar-day">—</div>
+          <div class="ubar-sub">Anexe os arquivos para este dia e clique em salvar</div>
+        </div>
+        <button class="btn-salvar" id="btn-salvar" onclick="salvarDia()">💾 Salvar e publicar</button>
+      </div>
+      <div class="slots-row">
+        <div class="slot-mini rdr" id="slot-rdr">
+          <input type="file" id="inp-rdr" accept=".xlsx,.xlsb,.xls" onchange="carregarArquivo('rdr',this.files[0])">
+          <div class="sm-ico">🏦</div>
+          <div class="sm-info">
+            <div class="sm-name">RDR — BACEN</div>
+            <div class="sm-st" id="st-rdr">Nenhum arquivo</div>
+          </div>
+          <button class="btn-anx" id="btn-anx-rdr" onclick="document.getElementById('inp-rdr').click()">📎 Anexar</button>
+          <button class="btn-rm" id="rm-rdr" title="Remover arquivo" onclick="removerArquivo('rdr')" disabled>✕</button>
+        </div>
+        <div class="slot-mini consumidor" id="slot-cons">
+          <input type="file" id="inp-cons" accept=".xlsx,.xlsb,.xls" onchange="carregarArquivo('consumidor',this.files[0])">
+          <div class="sm-ico">💬</div>
+          <div class="sm-info">
+            <div class="sm-name">Consumidor.gov.br</div>
+            <div class="sm-st" id="st-cons">Nenhum arquivo</div>
+          </div>
+          <button class="btn-anx" id="btn-anx-cons" onclick="document.getElementById('inp-cons').click()">📎 Anexar</button>
+          <button class="btn-rm" id="rm-cons" title="Remover arquivo" onclick="removerArquivo('consumidor')" disabled>✕</button>
+        </div>
+        <div class="slot-mini procon" id="slot-proc">
+          <input type="file" id="inp-proc" accept=".xlsx,.xlsb,.xls" onchange="carregarArquivo('procon',this.files[0])">
+          <div class="sm-ico">⚖️</div>
+          <div class="sm-info">
+            <div class="sm-name">PROCON</div>
+            <div class="sm-st" id="st-proc">Nenhum arquivo</div>
+          </div>
+          <button class="btn-anx" id="btn-anx-proc" onclick="document.getElementById('inp-proc').click()">📎 Anexar</button>
+          <button class="btn-rm" id="rm-proc" title="Remover arquivo" onclick="removerArquivo('procon')" disabled>✕</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dados do dia -->
+<div class="data-area" id="data-area">
+      <div class="data-empty" id="data-empty">
+        <div class="ei">📅</div>
+        <p>Selecione um dia no calendário para visualizar ou inserir dados</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══ SUPABASE ══ */
+const SB_URL='https://yaaoisqyxfqocrnlymjm.supabase.co';
+const SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhYW9pc3F5eGZxb2Nybmx5bWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NjkxNjYsImV4cCI6MjA4NjQ0NTE2Nn0.GffNyO_nYJZKkACJsaX2AuHOkh0kOa58-b3fnMgaixg';
+const H={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`};
+const sbGet=(t,p='')=>{
+  const c=new AbortController();
+  const tm=setTimeout(()=>c.abort(),15000);
+  return fetch(`${SB_URL}/rest/v1/${t}?${p}`,{headers:H,signal:c.signal})
+    .finally(()=>clearTimeout(tm))
+    .then(r=>r.json())
+    .catch(e=>{console.warn('sbGet erro:',t,e.message);return[];});
+};
+const sbPost=(t,b)=>fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...H,'Prefer':'return=representation'},body:JSON.stringify(b)}).then(r=>r.json());
+
+/* ══ FERIADOS NACIONAIS 2026 ══ */
+const FERIADOS=new Set(['2026-04-03','2026-04-21','2026-05-01','2026-06-04','2026-09-07','2026-10-12','2026-11-02','2026-11-15','2026-12-25']);
+
+/* ══ ESTADO ══ */
+let calAno=2026,calMes=3;
+let diaSel=null;
+let todasDemandas=[];
+let dadosPorDia={};
+let stLocal={rdr:null,consumidor:null,procon:null,rdr_det:null,cons_det:null};
+const charts={};
+
+const MESES=['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
+
+const DTAG={
+  'Portabilidade de saída':'background:#eff4ff;color:#1a56db',
+  'Cópia do contrato':'background:#ecfdf5;color:#0b7a5e',
+  'Desconhece operação':'background:#f5f3ff;color:#7c3aed',
+  'Blacklist':'background:#fff1f0;color:#c0392b',
+  'Juros abusivos':'background:#fffbeb;color:#b45309',
+  'Solicita refinanciamento':'background:#f0fdf4;color:#166534',
+  'Refinanciamento cancelado':'background:#fdf2f8;color:#993556',
+  'Desembolso de troco pendente':'background:#f8f9fa;color:#5f5e5a',
+  'Valores a receber':'background:#fffbeb;color:#b45309',
+  'Extrato/DED':'background:#ecfdf5;color:#0b7a5e',
+};
+const CORES=['#1a56db','#0b7a5e','#7c3aed','#c0392b','#b45309','#166534','#993556','#5f5e5a','#0e7490','#6d28d9'];
+
+
+/* Verifica se um registro está encerrado/resolvido — prazo vencido não conta nesses casos */
+function isEncerrado(r){
+  const s = String(r.status||r.demanda||'').toLowerCase();
+  return s.includes('encerrad') || s.includes('finaliz') || s.includes('baixado') ||
+         s.includes('respondid') || s.includes('resolvid') || s.includes('arquivad') ||
+         s.includes('cancelad') || s.includes('concluíd') || s.includes('concluido');
+}
+
+/* ══ INIT ══ */
+window.addEventListener('DOMContentLoaded',async()=>{
+  renderCal();
+  await carregarDados();
+});
+
+async function carregarDados(){
+  try{
+    // Paginação: Supabase limita 1000 linhas por request
+    // Busca em páginas de 1000 até trazer tudo
+    const SELECT = 'id,canal,data_ref,inserted_date,numero,demandante,cpf,abertura,prazo,demanda,status,safra,extra1,extra2,descricao,colaborador';
+    let demandas = [];
+    let offset = 0;
+    const PAGE = 1000;
+    while(true){
+      const ctrl = new AbortController();
+      const timer = setTimeout(()=>ctrl.abort(), 15000);
+      const url = `${SB_URL}/rest/v1/canais_criticos_demandas?select=${SELECT}&order=data_ref.asc,id.asc&limit=${PAGE}&offset=${offset}`;
+      const respRaw = await fetch(url, {headers:{...H,'Range-Unit':'items','Range':`${offset}-${offset+PAGE-1}`}, signal:ctrl.signal}).finally(()=>clearTimeout(timer));
+      const page = await respRaw.json();
+      if(!Array.isArray(page)||page.length===0) break;
+      demandas = demandas.concat(page);
+      if(page.length < PAGE) break; // última página
+      offset += PAGE;
+    }
+    todasDemandas=demandas||[];
+    dadosPorDia={};
+    todasDemandas.forEach(d=>{
+      const k=d.data_ref;if(!k)return;
+      if(!dadosPorDia[k])dadosPorDia[k]={rdr:[],consumidor:[],procon:[]};
+      dadosPorDia[k][d.canal]?.push(d);
+    });
+    renderCal();
+    atualizarSomatoria();
+    if(diaSel)abrirDia(diaSel);
+  }catch(e){console.warn('carregarDados:',e.message);toast('⚠ Sem conexão com banco','err');}
+}
+
+
+/* Mostra no slot quantos registros estão salvos no banco por canal */
+function atualizarSlotsDosBanco(){
+  const mapa = {
+    rdr:       'st-rdr',
+    consumidor:'st-cons',
+    procon:    'st-proc',
+  };
+  for(const [canal, stId] of Object.entries(mapa)){
+    const n   = todasDemandas.filter(d=>d.canal===canal).length;
+    const stEl = document.getElementById(stId);
+    if(stEl && !stLocal[canal]){
+      if(n > 0){
+        stEl.textContent = `🗄 ${n} no banco`;
+        stEl.style.color = 'var(--ok)';
+        stEl.style.fontWeight = '500';
+      } else {
+        stEl.textContent = 'Nenhum arquivo';
+        stEl.style.color  = '';
+        stEl.style.fontWeight = '';
+      }
+    }
+  }
+}
+
+function atualizarSomatoria(){
+  const tr=todasDemandas.filter(d=>d.canal==='rdr').length;
+  const tc=todasDemandas.filter(d=>d.canal==='consumidor').length;
+  const tp=todasDemandas.filter(d=>d.canal==='procon').length;
+
+  // Pendentes locais (ainda nao salvos)
+  const pr=stLocal.rdr?.rows?.length||0;
+  const pc=stLocal.consumidor?.rows?.length||0;
+  const pp=stLocal.procon?.rows?.length||0;
+
+  document.getElementById('sum-rdr').textContent=tr;
+  document.getElementById('sum-cons').textContent=tc;
+  document.getElementById('sum-proc').textContent=tp;
+
+  // Atualizar status dos slots com total do banco
+  const updateSlot=(stId,bancoTotal,localRows)=>{
+    const el=document.getElementById(stId);
+    if(!el)return;
+    if(localRows>0){
+      el.textContent=`✅ ${localRows} carregados`;el.className='sm-st ok';
+    } else if(bancoTotal>0){
+      el.textContent=`🗄 ${bancoTotal} no banco`;el.className='sm-st';
+      el.style.color='var(--ok)';
+    } else {
+      el.textContent='Nenhum arquivo';el.className='sm-st';
+      el.style.color='';
+    }
+  };
+  updateSlot('st-rdr', tr, pr);
+  updateSlot('st-cons', tc, pc);
+  updateSlot('st-proc', tp, pp);
+  document.getElementById('sum-total').textContent=tr+tc+tp+(pr+pc+pp);
+
+  // Badges pendentes
+  const setPend=(id,n)=>{
+    const el=document.getElementById(id);
+    if(!el)return;
+    if(n>0){el.textContent=`+${n} pend.`;el.style.display='inline';}
+    else el.style.display='none';
+  };
+  setPend('pend-rdr',pr);
+  setPend('pend-cons',pc);
+  setPend('pend-proc',pp);
+
+  // Total geral inclui pendentes
+  const totalGeral=tr+tc+tp+pr+pc+pp;
+  document.getElementById('sum-total').textContent=totalGeral;
+
+  document.getElementById('chip-rdr').textContent=`RDR ${tr+(pr?'+'+pr:'')}`;
+  document.getElementById('chip-cons').textContent=`Consumidor ${tc+(pc?'+'+pc:'')}`;
+  document.getElementById('chip-proc').textContent=`PROCON ${tp+(pp?'+'+pp:'')}`;
+}
+
+/* ══ CALENDÁRIO ══ */
+function mudarMes(d){
+  calMes+=d;
+  if(calMes>11){calMes=0;calAno++;}
+  if(calMes<0){calMes=11;calAno--;}
+  renderCal();
+}
+
+function renderCal(){
+  document.getElementById('cal-ml').textContent=`${MESES[calMes].slice(0,3)} ${calAno}`;
+  const hoje=iso(new Date());
+  const pri=new Date(calAno,calMes,1).getDay();
+  const dias=new Date(calAno,calMes+1,0).getDate();
+  let h='';
+  for(let i=0;i<pri;i++)h+='<div class="cd"></div>';
+  for(let d=1;d<=dias;d++){
+    const ds=iso(new Date(calAno,calMes,d));
+    const dow=new Date(calAno,calMes,d).getDay();
+    const fer=FERIADOS.has(ds),wknd=dow===0||dow===6;
+    const sel=ds===diaSel,isHoje=ds===hoje,tem=!!dadosPorDia[ds];
+    // Todos os dias clicáveis — MOL registra reclamações em fins de semana e feriados
+    let cls='cd util';
+    if(wknd)cls+=' wknd';
+    if(fer)cls+=' feriado';
+    if(isHoje)cls+=' hoje';
+    if(sel)cls+=' sel';
+    if(tem)cls+=' tem';
+    const dots=tem?renderDots(dadosPorDia[ds]):'';
+    const oc=`onclick="abrirDia('${ds}')"`;
+    const tt=fer?'title="Feriado"':wknd?'title="Fim de semana"':'';
+    h+=`<div class="${cls}" ${oc} ${tt}><span>${d}</span>${dots?`<div class="cdots">${dots}</div>`:''}</div>`;
+  }
+  document.getElementById('cal-grid').innerHTML=h;
+}
+
+function renderDots(dd){
+  let h='';
+  if(dd.rdr?.length)h+='<div class="cdot rdr"></div>';
+  if(dd.consumidor?.length)h+='<div class="cdot cons"></div>';
+  if(dd.procon?.length)h+='<div class="cdot proc"></div>';
+  return h;
+}
+
+/* ══ ABRIR DIA ══ */
+function abrirDia(ds){
+  diaSel=ds;
+  stLocal={rdr:null,consumidor:null,procon:null,rdr_det:null,cons_det:null};
+  resetSlots();
+  atualizarSomatoria(); // ← restaura "🗄 X no banco" nos slots
+  renderCal();
+
+  const [y,m,d]=ds.split('-');
+  document.getElementById('ubar-day').textContent=`📅 ${d}/${m}/${y}`;
+  document.getElementById('upload-bar').classList.add('show');
+  document.getElementById('btn-salvar').classList.remove('ready');
+
+  renderDiaDados(ds);
+}
+
+function resetSlots(){
+  ['rdr','consumidor','procon'].forEach(c=>{
+    const stEl=document.getElementById('st-'+c);
+    const btnSel={rdr:'slot-rdr',consumidor:'slot-cons',procon:'slot-proc',rdr_det:'slot-rdr-det',cons_det:'slot-cons-det'}[c];
+    const rmId={rdr:'rm-rdr',consumidor:'rm-cons',procon:'rm-proc',rdr_det:'rm-rdr-det'}[c];
+    const btnEl=document.querySelector(`#${btnSel} .btn-anx`);
+    const rmBtn=document.getElementById(rmId);
+    if(stEl){stEl.textContent='Nenhum arquivo';stEl.className='sm-st';}
+    if(btnEl){btnEl.textContent='📎 Anexar';btnEl.classList.remove('ok');}
+    if(rmBtn){rmBtn.classList.remove('show');rmBtn.disabled=true;}
+    const inp=document.getElementById('inp-'+c);
+    if(inp)inp.value='';
+  });
+}
+
+/* ══ RENDER DADOS DO DIA ══ */
+function renderDiaDados(ds){
+  // Mescla dados do banco + dados locais ainda não salvos
+  const banco=dadosPorDia[ds]||{rdr:[],consumidor:[],procon:[]};
+  const dia={
+    rdr:       [...banco.rdr,       ...(stLocal.rdr?.rows?.map(r=>({...r,_local:true}))||[])],
+    consumidor:[...banco.consumidor,...(stLocal.consumidor?.rows?.map(r=>({...r,_local:true}))||[])],
+    procon:    [...banco.procon,    ...(stLocal.procon?.rows?.map(r=>({...r,_local:true}))||[])],
+  };
+  const today=new Date();today.setHours(0,0,0,0);
+  const in3=new Date(today);in3.setDate(in3.getDate()+3);
+
+  const allRows=[...dia.rdr,...dia.consumidor,...dia.procon];
+  const total=allRows.length;
+
+  // KPIs gerais do dia
+  let venc=0,urg=0,ok=0;
+  allRows.forEach(r=>{
+    const p=pd(r.prazo);
+    if(!p){ok++;return;}
+    p.setHours(0,0,0,0);
+    if(p<today){if(isEncerrado(r))ok++;else venc++;}
+    else if(p<=in3)urg++;
+    else ok++;
+  });
+
+  const [y,m,d]=ds.split('-');
+  const lbl=`${d}/${m}/${y}`;
+
+  const area=document.getElementById('data-area');
+  area.innerHTML=`
+    ${venc>0?`<div class="alert danger">⚠ ${venc} demanda(s) com prazo VENCIDO neste dia.</div>`:''}
+    ${urg>0?`<div class="alert warn">⏰ ${urg} demanda(s) vencendo em 3 dias.</div>`:''}
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-lbl">Total do dia</div><div class="kpi-val" style="color:var(--ink)">${total}</div><div class="kpi-sub">${lbl}</div></div>
+      <div class="kpi"><div class="kpi-lbl">Vencendo (3d)</div><div class="kpi-val warn">${urg}</div><div class="kpi-sub">requer atenção</div></div>
+      <div class="kpi"><div class="kpi-lbl">Vencidos</div><div class="kpi-val danger">${venc}</div><div class="kpi-sub">prazo expirado</div></div>
+      <div class="kpi"><div class="kpi-lbl">Dentro do prazo</div><div class="kpi-val ok">${ok}</div><div class="kpi-sub">sem urgência</div></div>
+    </div>
+    <div class="ctabs">
+      <button class="ctab active" data-c="rdr" onclick="trocarTab('rdr',this)"><span class="pip"></span>RDR — BACEN (${dia.rdr.length})</button>
+      <button class="ctab" data-c="consumidor" onclick="trocarTab('consumidor',this)"><span class="pip"></span>Consumidor.gov.br (${dia.consumidor.length})</button>
+      <button class="ctab" data-c="procon" onclick="trocarTab('procon',this)"><span class="pip"></span>PROCON (${dia.procon.length})</button>
+    </div>
+    <div id="cpanel-rdr" class="cpanel active">${buildCanalPanel('rdr',dia.rdr,today,in3)}</div>
+    <div id="cpanel-consumidor" class="cpanel">${buildCanalPanel('consumidor',dia.consumidor,today,in3)}</div>
+    <div id="cpanel-procon" class="cpanel">${buildCanalPanel('procon',dia.procon,today,in3)}</div>
+  `;
+
+  // Desenhar gráficos
+  requestAnimationFrame(()=>{
+    ['rdr','consumidor','procon'].forEach(c=>{
+      if(dia[c].length)drawCanalCharts(c,dia[c]);
+    });
+  });
+}
+
+/* ══ SCORE CONSUMIDOR.GOV.BR ══
+   Calcula com base em TODOS os registros do canal consumidor no banco.
+   Conta apenas "encerrada" e "finalizada" como resolvidas (status terminais).
+   "em análise", "aguardando" etc. NÃO são resolvidas.
+*/
+function buildScoreConsumidor(){
+  const todos=todasDemandas.filter(d=>d.canal==='consumidor');
+  if(!todos.length)return'';
+  const total=todos.length;
+  const resolvidas=todos.filter(r=>{
+    const s=String(r.status||'').toLowerCase();
+    return s.includes('encerrada')||s.includes('finalizada');
+  }).length;
+  const resolucaoPct=total?(resolvidas/total*100):0;
+  const score=total?(resolvidas/total*5):0;
+  const scoreStr=score.toFixed(2);
+  const resolucaoStr=resolucaoPct.toFixed(1);
+  const barPct=Math.round(score/5*100);
+  const corClass=score>=4?'var(--ok)':score>=3?'var(--warn)':'var(--danger)';
+  // Respondidas = com status não vazio / não pendente
+  const respondidas=todos.filter(r=>{
+    const s=String(r.status||'').toLowerCase().trim();
+    return s&&s!=='—'&&!s.includes('pendente')&&!s.includes('sem status');
+  }).length;
+  const respPct=total?(respondidas/total*100).toFixed(1):'0.0';
+  return`<div style="background:var(--cons-bg);border:1px solid rgba(11,122,94,.18);border-radius:var(--r);padding:12px 14px;margin-bottom:10px">
+    <div style="font-size:9px;font-weight:700;color:var(--cons);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📊 Indicador Consumidor.gov.br — Acumulado total</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:end">
+      <div>
+        <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Score estimado</div>
+        <div style="font-size:24px;font-weight:700;color:${corClass};line-height:1">${scoreStr}<span style="font-size:12px;color:var(--ink3);font-weight:400">/5 ⭐</span></div>
+        <div style="height:3px;background:rgba(0,0,0,.07);border-radius:2px;margin-top:6px;overflow:hidden"><div style="height:100%;width:${barPct}%;background:${corClass};border-radius:2px;transition:width .5s"></div></div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Resolução</div>
+        <div style="font-size:24px;font-weight:700;color:var(--cons);line-height:1">${resolucaoStr}<span style="font-size:12px;font-weight:400">%</span></div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:3px">${resolvidas} enc/final de ${total}</div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Respondidas</div>
+        <div style="font-size:24px;font-weight:700;color:var(--ink);line-height:1">${respPct}<span style="font-size:12px;font-weight:400">%</span></div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:3px">${respondidas} de ${total}</div>
+      </div>
+      <div>
+        <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Total banco</div>
+        <div style="font-size:24px;font-weight:700;color:var(--ink);line-height:1">${total}</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:3px">registros consumidor</div>
+      </div>
+    </div>
+  </div>`;
+}
+
+function buildCanalPanel(canal,rows,today,in3){
+  const cfg={rdr:{cor:'#1a56db',cls:'rdr',ico:'🏦',nome:'RDR — BACEN'},consumidor:{cor:'#0b7a5e',cls:'cons',ico:'💬',nome:'Consumidor.gov.br'},procon:{cor:'#7c3aed',cls:'proc',ico:'⚖️',nome:'PROCON'}};
+  const c=cfg[canal];
+
+  if(!rows.length){
+    // Para BACEN e PROCON, mostrar em quais dias há dados
+    let dicaDias = '';
+    if(canal==='rdr'||canal==='procon'){
+      const diasComDados = Object.entries(dadosPorDia)
+        .filter(([d,v])=>v[canal]&&v[canal].length>0)
+        .map(([d,v])=>{const[y,m,dd]=d.split('-');return`${dd}/${m} (${v[canal].length})`;})
+        .slice(0,5).join(', ');
+      if(diasComDados) dicaDias=`<div style="font-size:10px;color:var(--ink3);margin-top:6px">📅 Dados disponíveis em: <strong>${diasComDados}</strong></div>`;
+    }
+    return `<div class="canal-zero"><div class="zi">${c.ico}</div><p>${c.nome}<br><strong>0 registros</strong> neste dia</p>${dicaDias}</div>`;
+  }
+  const temLocal=rows.some(r=>r._local);
+  const bannerLocal=temLocal?`<div style="background:#fffbeb;border:1px solid rgba(180,83,9,.2);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;font-weight:500;color:#b45309;display:flex;align-items:center;gap:6px;">⚠ Dados locais — clique em <strong>Salvar e publicar</strong> para confirmar</div>`:'';
+
+  let venc=0,urg=0,ok=0;
+  const demC={},stC={},prazos=[];
+  rows.forEach(r=>{
+    const dem=r.demanda||'—',st=r.status||'Sem status';
+    demC[dem]=(demC[dem]||0)+1;
+    stC[st]=(stC[st]||0)+1;
+    const prazo=pd(r.prazo);
+    if(prazo){
+      prazo.setHours(0,0,0,0);
+      let b='o';
+      if(prazo<today){venc++;b='v';}
+      else if(prazo<=in3){urg++;b='u';}
+      else ok++;
+      prazos.push({nome:r.demandante,prazo,b});
+    }else ok++;
+  });
+  prazos.sort((a,b)=>({v:0,u:1,o:2}[a.b]-{v:0,u:1,o:2}[b.b]||a.prazo-b.prazo));
+
+  const prazoH=prazos.slice(0,8).map(p=>`
+    <div class="pl-row">
+      <span class="pl-nome" title="${p.nome}">${p.nome}</span>
+      <span class="pl-data">${fd(p.prazo)}</span>
+      <span class="badge ${p.b}">${{v:'Vencido',u:'Urgente',o:'OK'}[p.b]}</span>
+    </div>`).join('')||'<p style="font-size:10px;color:var(--ink3)">Sem prazos cadastrados</p>';
+
+  const ch=Math.max(120,Object.keys(demC).length*30+40);
+  const isRdr=canal==='rdr';
+  const isPro=canal==='procon';
+
+  // ── Colunas exatas de cada planilha ──────────────────────
+  const headsMap = {
+    rdr:        ['Número','Colaborador','Nome','Data Captura','Data Cadastro','Disponibilização','Prazo','Situação','Respondido','Demanda','CPF'],
+    consumidor: ['Protocolo','Reclamante','CPF','Capturada em','Data abertura','Tag(s)','Situação','Tipo produto','Safra','Descrição'],
+    procon:     ['Protocolo','Reclamante','CPF','Capturada em','Data Cadastro CIP','Prazo resp. CIP','Situação','Procon','Município','Reclamado','Colaborador','Protocolo Adm.'],
+  };
+  const fieldsMap = {
+    rdr:        ['numero','colaborador','demandante','abertura','extra2','extra1','prazo','status','descricao','demanda','cpf'],
+    consumidor: ['numero','demandante','cpf','abertura','prazo','demanda','status','extra2','safra','descricao'],
+    procon:     ['numero','demandante','cpf','abertura','_data_cip','prazo','status','extra1','extra2','_reclamado','colaborador','_proto_adm'],
+  };
+  const heads  = headsMap[canal]  || headsMap.consumidor;
+  const fields = fieldsMap[canal] || fieldsMap.consumidor;
+
+  // Campos especiais do PROCON que vêm do dados_raw
+  const getField=(r,f)=>{
+    if(f.startsWith('_')){
+      const raw=r.dados_raw||{};
+      if(f==='_data_cip')   return raw['Data Cadastro CIP']||'—';
+      if(f==='_reclamado')  return raw['Reclamado']||'—';
+      if(f==='_proto_adm')  return raw['Protocolo Adm.']||'—';
+      return '—';
+    }
+    return r[f]??'';
+  };
+
+  let tableH=`<div class="twrap"><table><thead><tr>${heads.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>`;
+  rows.forEach(r=>{
+    tableH+='<tr>';
+    fields.forEach(f=>{
+      let v=getField(r,f);
+      if(f==='demanda'&&v&&v!=='—'){const s=DTAG[v]||'background:#f8f9fa;color:#5f5e5a';v=`<span class="dtag" style="${s}">${v}</span>`;}
+      else if(f==='descricao'&&v&&v!=='—'){v=`<span title="${String(v).replace(/"/g,'&quot;')}">${String(v).slice(0,55)}${String(v).length>55?'…':''}</span>`;}
+      else if(f==='status'&&isPro&&v&&v!=='—'){v=`<span style="font-size:9px;color:var(--ink2)">${String(v).slice(0,60)}${String(v).length>60?'…':''}</span>`;}
+      tableH+=`<td>${v||'—'}</td>`;
+    });
+    tableH+='</tr>';
+  });
+  tableH+='</tbody></table></div>';
+
+  return `
+    ${bannerLocal}
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <div style="font-size:11px;font-weight:600;color:var(--ink2)">${c.ico} ${c.nome} — ${rows.length} registros</div>
+      <div style="display:flex;gap:6px">
+        <button class="btn-excluir-canal" onclick="pedirExclusao('${canal}','${diaSel}',false)" title="Excluir só este dia">🗑 Este dia</button>
+        <button class="btn-excluir-canal" onclick="pedirExclusao('${canal}','${diaSel}',true)" title="Excluir todos os dias" style="background:var(--danger-bg);color:var(--danger);border-color:rgba(192,57,43,.2)">🗑 Todo o canal</button>
+      </div>
+    </div>
+    <div class="ckpi-row">
+      <div class="kpi"><div class="kpi-lbl">Total</div><div class="kpi-val ${c.cls}">${rows.length}</div><div class="kpi-sub">no canal</div></div>
+      <div class="kpi"><div class="kpi-lbl">Vencendo</div><div class="kpi-val warn">${urg}</div><div class="kpi-sub">3 dias</div></div>
+      <div class="kpi"><div class="kpi-lbl">Vencidos</div><div class="kpi-val danger">${venc}</div><div class="kpi-sub">prazo expirado</div></div>
+      <div class="kpi"><div class="kpi-lbl">No prazo</div><div class="kpi-val ok">${ok}</div><div class="kpi-sub">sem urgência</div></div>
+    </div>
+    ${canal==='consumidor'?buildScoreConsumidor():''}
+    <div class="cg2">
+      <div class="card"><div class="card-t">Demandas por tipo</div><div style="position:relative;height:${ch}px"><canvas id="ch-dem-${canal}"></canvas></div></div>
+      <div class="card"><div class="card-t">Prazos críticos</div>${prazoH}</div>
+    </div>
+    <div class="cg3">
+      <div class="card"><div class="card-t">Recebimentos por data</div><div style="position:relative;height:120px"><canvas id="ch-dat-${canal}"></canvas></div></div>
+      <div class="card"><div class="card-t">${isRdr?'Status':'Tipo produto'}</div><div style="position:relative;height:120px"><canvas id="ch-st-${canal}"></canvas></div></div>
+    </div>
+    <div class="card"><div class="card-t">${c.nome} · ${rows.length} registros</div>${tableH}</div>
+  `;
+}
+
+function drawCanalCharts(canal,rows){
+  const demC={},stC={},dtC={};
+  rows.forEach(r=>{
+    const dem=r.demanda||'—',st=r.status||'Sem status';
+    demC[dem]=(demC[dem]||0)+1;
+    stC[st]=(stC[st]||0)+1;
+    const ab=pd(r.abertura);
+    if(ab){const k=ab.toLocaleDateString('pt-BR');dtC[k]=(dtC[k]||0)+1;}
+  });
+  const cfg={rdr:'#1a56db',consumidor:'#0b7a5e',procon:'#7c3aed'};
+  const cor=cfg[canal];
+
+  // Barras horizontal — demandas
+  const lblD=Object.keys(demC).sort((a,b)=>demC[b]-demC[a]);
+  drawChart('ch-dem-'+canal,'bar',{labels:lblD,datasets:[{data:lblD.map(l=>demC[l]),backgroundColor:CORES,borderRadius:3}]},
+    {indexAxis:'y',plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:9},stepSize:1}},y:{grid:{display:false},ticks:{font:{size:9}}}}});
+
+  // Linha — datas
+  const lblDt=Object.keys(dtC).sort((a,b)=>{const[da,ma]=a.split('/').map(Number),[db,mb]=b.split('/').map(Number);return ma-mb||da-db;});
+  drawChart('ch-dat-'+canal,'line',{labels:lblDt,datasets:[{data:lblDt.map(l=>dtC[l]),borderColor:cor,backgroundColor:cor+'1a',fill:true,tension:.4,pointRadius:3,pointBackgroundColor:cor}]},
+    {plugins:{legend:{display:false}},scales:{x:{grid:{display:false},ticks:{font:{size:8},maxRotation:45}},y:{grid:{color:'rgba(0,0,0,.04)'},ticks:{font:{size:9},stepSize:1}}}});
+
+  // Donut — status
+  const lblS=Object.keys(stC);
+  drawChart('ch-st-'+canal,'doughnut',{labels:lblS,datasets:[{data:lblS.map(l=>stC[l]),backgroundColor:CORES,borderWidth:0,hoverOffset:4}]},
+    {cutout:'55%',plugins:{legend:{display:true,position:'right',labels:{font:{size:8},boxWidth:7,padding:4}}}});
+}
+
+function drawChart(id,type,data,options){
+  if(charts[id])charts[id].destroy();
+  const ctx=document.getElementById(id);if(!ctx)return;
+  charts[id]=new Chart(ctx,{type,data,options:{responsive:true,maintainAspectRatio:false,...options}});
+}
+
+function trocarTab(id,btn){
+  document.querySelectorAll('.ctab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.cpanel').forEach(p=>p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('cpanel-'+id).classList.add('active');
+}
+
+/* ══ UPLOAD LOCAL ══ */
+function carregarArquivo(canal,file){
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+    let sh=null;
+    // Selecionar aba correta por canal
+    // Padrão definitivo: BACEN_RDR → aba BACEN_RDR | Consumidor → aba Table | PROCON → aba PROCON
+    if(canal==='rdr'){
+      sh = wb.SheetNames.find(n=>/^bacen/i.test(n.trim()))   // BACEN_RDR (padrão)
+        || wb.SheetNames.find(n=>/^table$/i.test(n.trim()))  // Table (MOL)
+        || wb.SheetNames.find(n=>/base/i.test(n))            // Base 02.04
+        || wb.SheetNames[0];
+    }
+    else if(canal==='rdr_det'){
+      sh = wb.SheetNames.find(n=>/base/i.test(n))
+        || wb.SheetNames.find(n=>/^table$/i.test(n.trim()))
+        || wb.SheetNames[0];
+    }
+    else if(canal==='consumidor'){
+      sh = wb.SheetNames.find(n=>/^table$/i.test(n.trim()))  // Table (padrão)
+        || wb.SheetNames.find(n=>/consumidor/i.test(n))
+        || wb.SheetNames[0];
+    }
+    else if(canal==='procon'){
+      sh = wb.SheetNames.find(n=>/^procon$/i.test(n.trim())) // PROCON (padrão)
+        || wb.SheetNames.find(n=>/^table$/i.test(n.trim()))
+        || wb.SheetNames[0];
+    }
+    else{
+      sh = wb.SheetNames[0];
+    }
+    // cellDates:true + raw:true → datas chegam como objetos Date
+    // Converte manualmente para DD/MM/AAAA HH:MM
+    const rawRows=XLSX.utils.sheet_to_json(wb.Sheets[sh],{
+      defval:'', raw:true, cellDates:true
+    });
+    // Serializar datas para string BR
+    const rows=rawRows.map(r=>{
+      const out={};
+      for(const [k,v] of Object.entries(r)){
+        if(v instanceof Date){
+          const d=String(v.getDate()).padStart(2,'0');
+          const m=String(v.getMonth()+1).padStart(2,'0');
+          const y=v.getFullYear();
+          const hh=String(v.getHours()).padStart(2,'0');
+          const mm=String(v.getMinutes()).padStart(2,'0');
+          // Se tem hora relevante, inclui; senão só data
+          out[k]=(v.getHours()||v.getMinutes())?`${d}/${m}/${y} ${hh}:${mm}`:`${d}/${m}/${y}`;
+        } else {
+          out[k]=v===null||v===undefined?'':v;
+        }
+      }
+      return out;
+    });
+    const norm=normalizar(canal,rows);
+    stLocal[canal]=stLocal[canal]?{...stLocal[canal],rows:[...stLocal[canal].rows,...norm]}:{rows:norm,fileName:file.name,sh};
+    const stId={rdr:'st-rdr',consumidor:'st-cons',procon:'st-proc',rdr_det:'st-rdr-det',cons_det:'st-cons-det'}[canal];
+    const btnSel={rdr:'slot-rdr',consumidor:'slot-cons',procon:'slot-proc',rdr_det:'slot-rdr-det',cons_det:'slot-cons-det'}[canal];
+    const stEl=document.getElementById(stId);
+    if(stEl){stEl.textContent=`✅ ${stLocal[canal].rows.length} registros`;stEl.className='sm-st ok';}
+    const bAnx=document.querySelector(`#${btnSel} .btn-anx`);
+    if(bAnx){bAnx.textContent='📎 +Mais';bAnx.classList.add('ok');}
+    const rmId={rdr:'rm-rdr',consumidor:'rm-cons',procon:'rm-proc',rdr_det:'rm-rdr-det'}[canal];
+    const rmBtn=document.getElementById(rmId);
+    if(rmBtn){rmBtn.classList.add('show');rmBtn.disabled=false;}
+    document.getElementById('btn-salvar').classList.add('ready');
+    // Atualizar painel e somatória com dados locais
+    atualizarSomatoria();
+    if(diaSel) renderDiaDados(diaSel);
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+
+/* ══ REMOVER ARQUIVO ══ */
+function removerArquivo(canal){
+  stLocal[canal]=null;
+  const stId={rdr:'st-rdr',consumidor:'st-cons',procon:'st-proc',rdr_det:'st-rdr-det',cons_det:'st-cons-det'}[canal];
+  const btnSel={rdr:'slot-rdr',consumidor:'slot-cons',procon:'slot-proc',rdr_det:'slot-rdr-det',cons_det:'slot-cons-det'}[canal];
+  const rmId={rdr:'rm-rdr',consumidor:'rm-cons',procon:'rm-proc',rdr_det:'rm-rdr-det'}[canal];
+  const inpId={rdr:'inp-rdr',consumidor:'inp-cons',procon:'inp-proc',rdr_det:'inp-rdr-det',cons_det:'inp-cons-det'}[canal];
+  const stEl=document.getElementById(stId);
+  if(stEl){stEl.textContent='Nenhum arquivo';stEl.className='sm-st';}
+  const bAnx=document.querySelector(`#${btnSel} .btn-anx`);
+  if(bAnx){bAnx.textContent='📎 Anexar';bAnx.classList.remove('ok');}
+  const rmBtn=document.getElementById(rmId);
+  if(rmBtn)rmBtn.classList.remove('show');
+  const inp=document.getElementById(inpId);
+  if(inp)inp.value='';
+  // Desabilitar salvar se não tiver nenhum arquivo
+  const temAlgum=stLocal.rdr||stLocal.consumidor||stLocal.procon;
+  const btn=document.getElementById('btn-salvar');
+  if(btn)btn.classList.toggle('ready',!!temAlgum);
+  // Atualizar painel e somatória
+  atualizarSomatoria();
+  if(diaSel) renderDiaDados(diaSel);
+}
+
+
+
+
+
+/* ══════════════════════════════════════
+   BUSCA POR CLIENTE
+══════════════════════════════════════ */
+let buscaAberta = false;
+
+function buscaDigitando(val) {
+  // Busca automática só com 3+ caracteres para não sobrecarregar
+  if (val.trim().length >= 3) executarBusca(val);
+  else if (val.trim().length === 0) {
+    const r=document.getElementById('busca-results');
+    r.innerHTML=''; r.style.display='none';
+    document.getElementById('busca-count').textContent = '';
+  }
+}
+
+function toggleBusca() {
+  buscaAberta = !buscaAberta;
+  const w = document.getElementById('busca-wrap');
+  const b = document.getElementById('btn-busca');
+  w.classList.toggle('show', buscaAberta);
+  b.style.background  = buscaAberta ? 'var(--ink)' : '';
+  b.style.color       = buscaAberta ? '#fff' : '';
+  b.style.borderColor = buscaAberta ? 'transparent' : '';
+  if (buscaAberta) {
+    document.getElementById('busca-input').focus();
+    executarBusca('');
+  } else {
+    document.getElementById('busca-input').value = '';
+    const r=document.getElementById('busca-results');
+    r.innerHTML=''; r.style.display='none';
+    document.getElementById('busca-count').textContent='';
+  }
+}
+
+function executarBusca(termo) {
+  const val = termo !== undefined ? termo : (document.getElementById('busca-input')?.value||'');
+  const t = val.trim().toLowerCase();
+  const res = document.getElementById('busca-results');
+  const cnt = document.getElementById('busca-count');
+
+  if (!todasDemandas.length) {
+    res.style.display='block';
+    res.innerHTML = '<p style="font-size:11px;color:var(--ink3);padding:8px 0">Sem dados carregados ainda.</p>';
+    cnt.textContent = '';
+    return;
+  }
+
+  const filtrados = t.length < 2 ? todasDemandas : todasDemandas.filter(d =>
+    (d.demandante || '').toLowerCase().includes(t) ||
+    (d.cpf        || '').toLowerCase().includes(t) ||
+    (d.numero     || '').toLowerCase().includes(t) ||
+    (d.demanda    || '').toLowerCase().includes(t)
+  );
+
+  cnt.textContent = t.length >= 2 ? `${filtrados.length} resultado(s)` : '';
+
+  if (t.length < 2) { res.style.display='none'; res.innerHTML=''; return; }
+
+  res.style.display = 'block';
+  if (!filtrados.length) {
+    res.innerHTML = '<p style="font-size:11px;color:var(--ink3);padding:8px 0">Nenhum resultado encontrado.</p>';
+    return;
+  }
+
+  const CANAL_LABELS = { rdr:'RDR — BACEN', consumidor:'Consumidor.gov.br', procon:'PROCON' };
+
+  res.innerHTML = filtrados.slice(0, 50).map(d => {
+    const canal = d.canal || '';
+    const raw   = d.dados_raw ? (typeof d.dados_raw === 'string' ? JSON.parse(d.dados_raw) : d.dados_raw) : {};
+
+    // Montar campos específicos por canal
+    let camposExtra = '';
+    if (canal === 'rdr') {
+      camposExtra = `
+        <div class="cc-field"><div class="cc-label">Data de captura</div><div class="cc-val">${toBR(d.abertura)}</div></div>
+        <div class="cc-field"><div class="cc-label">Data de cadastro</div><div class="cc-val">${toBR(d.data_cadastro)}</div></div>
+        <div class="cc-field"><div class="cc-label">Data disponibilização</div><div class="cc-val">${toBR(d.data_disponibilizacao)}</div></div>
+        <div class="cc-field"><div class="cc-label">Prazo</div><div class="cc-val destaque">${toBR(d.prazo)}</div></div>
+        <div class="cc-field"><div class="cc-label">Situação</div><div class="cc-val">${d.demanda||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">Respondido plataforma</div><div class="cc-val">${d.respondido||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">Colaborador</div><div class="cc-val">${d.colaborador||'—'}</div></div>`;
+    } else if (canal === 'consumidor') {
+      camposExtra = `
+        <div class="cc-field"><div class="cc-label">Protocolo</div><div class="cc-val destaque">${d.numero||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">CPF</div><div class="cc-val">${d.cpf||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">Capturada em</div><div class="cc-val">${toBR(d.abertura)}</div></div>
+        <div class="cc-field"><div class="cc-label">Data de abertura</div><div class="cc-val">${toBR(d.data_cadastro)}</div></div>
+        <div class="cc-field"><div class="cc-label">Tags / Demanda</div><div class="cc-val destaque">${d.demanda||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">Situação</div><div class="cc-val">${d.status||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">Nome fantasia</div><div class="cc-val">${d.nome_fantasia||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">Colaborador</div><div class="cc-val">${d.colaborador||'—'}</div></div>`;
+    } else {
+      camposExtra = `
+        <div class="cc-field"><div class="cc-label">Protocolo</div><div class="cc-val destaque">${d.numero||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">CPF</div><div class="cc-val">${d.cpf||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">Capturada em</div><div class="cc-val">${toBR(d.abertura)}</div></div>
+        <div class="cc-field"><div class="cc-label">Prazo resp. CIP</div><div class="cc-val destaque">${toBR(d.prazo_cip)}</div></div>
+        <div class="cc-field"><div class="cc-label">Órgão PROCON</div><div class="cc-val">${d.procon_orgao||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">Município</div><div class="cc-val">${d.municipio||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">Reclamado</div><div class="cc-val">${d.reclamado||'—'}</div></div>
+        <div class="cc-field"><div class="cc-label">Data cadastro CIP</div><div class="cc-val">${toBR(d.data_cadastro_cip)}</div></div>
+        <div class="cc-field"><div class="cc-label">Colaborador</div><div class="cc-val">${d.colaborador||'—'}</div></div>`;
+    }
+
+    const situacaoCompleta = d.descricao && d.descricao.length > 5
+      ? `<div class="cc-extra"><div class="cc-label" style="margin-bottom:4px">Situação completa</div><div class="cc-sit">${d.descricao}</div></div>` : '';
+
+    return `
+      <div class="cliente-card">
+        <div class="cc-header">
+          <div class="cc-nome">${d.demandante || '—'}</div>
+          <span class="cc-canal ${canal}">${CANAL_LABELS[canal]||canal}</span>
+        </div>
+        <div class="cc-body">${camposExtra}</div>
+        ${situacaoCompleta}
+      </div>`;
+  }).join('');
+
+  if (filtrados.length > 50)
+    res.innerHTML += `<p style="font-size:11px;color:var(--ink3);text-align:center;padding:8px">… mostrando 50 de ${filtrados.length} resultados. Refine a busca para ver mais.</p>`;
+}
+
+/* ══ EXCLUIR DADOS DO CANAL ══ */
+let excluirPendente = null;
+
+function pedirExclusao(canal, ds, todos=false) {
+  const nomes = { rdr:'RDR — BACEN', consumidor:'Consumidor.gov.br', procon:'PROCON' };
+  const [y,m,d] = ds.split('-');
+  excluirPendente = { canal, ds, todos };
+  const titulo = todos
+    ? `🗑 Excluir TUDO — ${nomes[canal]}`
+    : `🗑 Excluir ${nomes[canal]} — ${d}/${m}/${y}`;
+  const msg = todos
+    ? `Você está prestes a excluir TODOS os registros de ${nomes[canal]} (todos os dias). Esta ação não pode ser desfeita.`
+    : `Você está prestes a excluir todos os registros de ${nomes[canal]} do dia ${d}/${m}/${y}. Esta ação não pode ser desfeita.`;
+  document.getElementById('modal-title').textContent = titulo;
+  document.getElementById('modal-msg').textContent = msg;
+  document.getElementById('modal-overlay').classList.add('show');
+}
+
+function fecharModal(e) {
+  if (e.target === document.getElementById('modal-overlay')) fecharModalBtn();
+}
+function fecharModalBtn() {
+  document.getElementById('modal-overlay').classList.remove('show');
+  excluirPendente = null;
+}
+
+async function confirmarExclusao() {
+  if (!excluirPendente) return;
+  const { canal } = excluirPendente;
+  fecharModalBtn();
+  toast('⏳ Excluindo…', 'info');
+
+  try {
+    // Pegar todos os data_refs deste canal no banco
+    const registros = await sbGet('canais_criticos_demandas',
+      `canal=eq.${canal}&select=data_ref`);
+    const dataRefs = [...new Set((registros||[]).map(r=>r.data_ref))];
+
+    // Deletar demandas de todos os data_refs deste canal
+    await fetch(`${SB_URL}/rest/v1/canais_criticos_demandas?canal=eq.${canal}`,
+      { method:'DELETE', headers:H });
+    // Deletar uploads correspondentes
+    await fetch(`${SB_URL}/rest/v1/canais_criticos_uploads?canal=eq.${canal}`,
+      { method:'DELETE', headers:H });
+
+    toast('✅ Todos os dados de '+{rdr:'RDR',consumidor:'Consumidor',procon:'PROCON'}[canal]+' excluídos.','ok');
+    await carregarDados();
+  } catch(e) {
+    toast('❌ Erro ao excluir.','err');
+    console.error(e);
+  }
+}
+
+/* ══ NORMALIZAR ══ */
+
+/* Converte qualquer data/hora para DD/MM/AAAA ou DD/MM/AAAA HH:MM */
+function toBR(v){
+  if(!v) return '—';
+  // JS Date object (cellDates:true)
+  if(v instanceof Date){
+    const d=String(v.getDate()).padStart(2,'0');
+    const m=String(v.getMonth()+1).padStart(2,'0');
+    const y=v.getFullYear();
+    const hh=String(v.getHours()).padStart(2,'0');
+    const mm=String(v.getMinutes()).padStart(2,'0');
+    return (v.getHours()||v.getMinutes()) ? `${d}/${m}/${y} ${hh}:${mm}` : `${d}/${m}/${y}`;
+  }
+  const s=String(v).trim();
+  if(!s||s==='—'||s==="'-") return '—';
+  // ISO com hora: 2026-04-01 09:16:08
+  const ih=s.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})/);
+  if(ih) return `${ih[3]}/${ih[2]}/${ih[1]} ${ih[4]}:${ih[5]}`;
+  // ISO só data: 2026-04-01
+  const i=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(i) return `${i[3]}/${i[2]}/${i[1]}`;
+  // BR com hora: 01/04/2026 09:16
+  const bh=s.match(/^(\d{2})\/(\d{2})\/(\d{4})\s+(\d{2}):(\d{2})/);
+  if(bh) return `${bh[1]}/${bh[2]}/${bh[3]} ${bh[4]}:${bh[5]}`;
+  // BR só data: 01/04/2026
+  const b=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if(b) return s.slice(0,10);
+  return s;
+}
+
+/* Converte para YYYY-MM-DD para salvar como data_ref no banco */
+function toISO(v){
+  if(!v) return null;
+  const br = toBR(v);
+  if(!br||br==='—') return null;
+  const m = br.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if(m) return `${m[3]}-${m[2]}-${m[1]}`;
+  const iso = String(v).match(/^(\d{4}-\d{2}-\d{2})/);
+  if(iso) return iso[1];
+  return null;
+}
+
+function normalizar(canal, rows){
+
+  /* ──────────────────────────────────────────────────────────
+     BACEN RDR — planilha padrão: BACEN_RDR_PADRAO_OK.xlsx
+     Aba: BACEN_RDR
+     Colunas: Número, Disponibilização, Prazo, Demandante,
+              CPF/CNPJ, Demanda, Status, Safra contrato,
+              ISPB, IF Solicitante, CNPJ, Corban
+  ────────────────────────────────────────────────────────── */
+  if(canal==='rdr') return rows.map(r=>({
+    numero:      String(r['Número']||r['Numero']||'').trim(),
+    demandante:  String(r['Demandante']||r['Nome']||''),
+    cpf:         String(r['CPF/CNPJ']||r['CPF']||'').trim(),
+    abertura:    toBR(r['Disponibilização']||r['Disponibilizacao']||r['Data de captura']||''),
+    prazo:       toBR(r['Prazo']||''),
+    demanda:     (r['Demanda']&&r['Demanda']!==null&&String(r['Demanda']).toLowerCase()!=='none'&&String(r['Demanda']).trim()!=='')?String(r['Demanda']):(r['Situação']?String(r['Situação']):'Pendente: IF/AC'),
+    status:      String(r['Status']||r['Situação']||''),
+    safra:       (r['Safra contrato']&&String(r['Safra contrato']).toLowerCase()!=='none')?String(r['Safra contrato']):'',
+    _demandaVazia: (!r['Demanda']||String(r['Demanda']).toLowerCase()==='none'),
+    extra1:      String(r['IF Solicitante']||''),
+    extra2:      String(r['Corban']||''),
+    descricao:   String(r['Respondido na plataforma']||''),
+    colaborador: String(r['Colaborador responsável']||''),
+    dados_raw:{
+      'Número':          String(r['Número']||''),
+      'Demandante':      String(r['Demandante']||r['Nome']||''),
+      'CPF/CNPJ':        String(r['CPF/CNPJ']||''),
+      'Disponibilização':toBR(r['Disponibilização']||r['Disponibilizacao']||''),
+      'Prazo':           toBR(r['Prazo']||''),
+      'Demanda':         String(r['Demanda']||''),
+      'Status':          String(r['Status']||''),
+      'Safra contrato':  String(r['Safra contrato']||''),
+      'ISPB':            String(r['ISPB']||''),
+      'IF Solicitante':  String(r['IF Solicitante']||''),
+      'CNPJ':            String(r['CNPJ']||''),
+      'Corban':          String(r['Corban']||''),
+    }
+  }));
+
+  /* ──────────────────────────────────────────────────────────
+     BACEN DETALHES — arquivo complementar (slot separado)
+     Aba: Base XX.XX
+  ────────────────────────────────────────────────────────── */
+  if(canal==='rdr_det') return rows.map(r=>({
+    numero:    String(r['Número']||r['Numero']||'').trim(),
+    demandante:String(r['Demandante']||''),
+    cpf:       String(r['CPF/CNPJ']||r['CPF']||'').trim(),
+    demanda:   String(r['Demanda']||''),
+    status:    String(r['Status']||''),
+    safra:     String(r['Safra contrato']||''),
+    extra1:    String(r['IF Solicitante']||''),
+    extra2:    String(r['Corban']||''),
+    abertura:  toBR(r['Disponibilização']||r['Disponibilizacao']||''),
+    prazo:     toBR(r['Prazo']||''),
+    dados_raw: r,
+  }));
+
+  /* ──────────────────────────────────────────────────────────
+     CONSUMIDOR — planilha padrão: Consumidor_PADRAO_OK.xlsx
+     Aba: Table
+     Colunas: Tags, Colaborador responsável, Protocolo,
+              Nome fantasia, Situação, Reclamante, CPF,
+              Data de abertura, Capturada em
+  ────────────────────────────────────────────────────────── */
+  if(canal==='consumidor') return rows.map(r=>{
+    const tags = String(r['Tags']||'').split(';').map(t=>t.trim()).filter(Boolean).join(', ') || '—';
+    return {
+      numero:      String(r['Protocolo']||''),
+      demandante:  String(r['Reclamante']||''),
+      cpf:         String(r['CPF']||''),
+      abertura:    toBR(r['Capturada em']||r['Data de abertura']||''),
+      prazo:       toBR(r['Data de abertura']||''),
+      demanda:     tags,
+      status:      String(r['Situação']||''),
+      safra:       '',
+      extra1:      String(r['Colaborador responsável']||''),
+      extra2:      String(r['Nome fantasia']||''),
+      descricao:   '',
+      colaborador: String(r['Colaborador responsável']||''),
+      dados_raw:{
+        'Tags':                  String(r['Tags']||''),
+        'Protocolo':             String(r['Protocolo']||''),
+        'Reclamante':            String(r['Reclamante']||''),
+        'CPF':                   String(r['CPF']||''),
+        'Data de abertura':      toBR(r['Data de abertura']||''),
+        'Capturada em':          toBR(r['Capturada em']||''),
+        'Situação':              String(r['Situação']||''),
+        'Nome fantasia':         String(r['Nome fantasia']||''),
+        'Colaborador responsável':String(r['Colaborador responsável']||''),
+      }
+    };
+  });
+
+  /* ──────────────────────────────────────────────────────────
+     CONSUMIDOR DETALHES — slot complementar (xlsb→xlsx)
+     Colunas extras: Tipo de produto, Safra, Descrição
+  ────────────────────────────────────────────────────────── */
+  if(canal==='cons_det') return rows.map(r=>({
+    protocolo:    String(r['Protocolo']||'').trim(),
+    demandante:   String(r['Reclamante']||''),
+    cpf:          String(r['CPF']||'').trim(),
+    tags:         String(r['Tags']||''),
+    tipo_produto: String(r['Tipo de produto']||''),
+    safra:        String(r['Safra contrato']||''),
+    descricao:    String(r['Descrição da reclamação']||r['Descricao da reclamacao']||''),
+    dados_raw:{
+      'Tags':                    String(r['Tags']||''),
+      'Protocolo':               String(r['Protocolo']||''),
+      'Reclamante':              String(r['Reclamante']||''),
+      'CPF':                     String(r['CPF']||''),
+      'Data de abertura':        toBR(r['Data de abertura']||''),
+      'Capturada em':            toBR(r['Capturada em']||''),
+      'Tipo de produto':         String(r['Tipo de produto']||''),
+      'Safra contrato':          String(r['Safra contrato']||''),
+      'Descrição da reclamação': String(r['Descrição da reclamação']||''),
+    }
+  }));
+
+  /* ──────────────────────────────────────────────────────────
+     PROCON — planilha padrão: PROCON_PADRAO_OK.xlsx
+     Aba: PROCON
+     Colunas: Colaborador responsável, Tags, Chave de integração,
+              Procon, Município, Protocolo, Reclamado, Reclamante,
+              CPF, Situação, Capturada em, Data Cadastro CIP,
+              Prazo de resposta CIP, Protocolo Adm., Prazo proc. adm.
+  ────────────────────────────────────────────────────────── */
+  return rows.map(r=>{
+    const sit  = String(r['Situação']||'');
+    const sit1 = sit.split('\n')[0].trim();
+    const status = sit1.includes('Aguardando') ? 'Aguardando Resposta'
+                 : sit1.includes('Em andamento') ? 'Em andamento'
+                 : sit1 || '—';
+    return {
+      numero:      String(r['Protocolo']||''),
+      demandante:  String(r['Reclamante']||''),
+      cpf:         String(r['CPF']||''),
+      abertura:    toBR(r['Capturada em']||''),
+      prazo:       toBR(r['Prazo de resposta CIP']||''),
+      demanda:     status,
+      status:      sit1 || '—',
+      safra:       '',
+      extra1:      String(r['Procon']||''),
+      extra2:      String(r['Município']||''),
+      descricao:   sit.replace(/\n/g,' | ').slice(0,300),
+      colaborador: String(r['Colaborador responsável']||''),
+      dados_raw:{
+        'Colaborador responsável': String(r['Colaborador responsável']||''),
+        'Procon':                  String(r['Procon']||''),
+        'Município':               String(r['Município']||''),
+        'Protocolo':               String(r['Protocolo']||''),
+        'Reclamado':               String(r['Reclamado']||''),
+        'Reclamante':              String(r['Reclamante']||''),
+        'CPF':                     String(r['CPF']||''),
+        'Situação':                sit,
+        'Capturada em':            toBR(r['Capturada em']||''),
+        'Data Cadastro CIP':       toBR(r['Data Cadastro CIP']||''),
+        'Prazo de resposta CIP':   toBR(r['Prazo de resposta CIP']||''),
+        'Protocolo Adm.':          String(r['Protocolo Adm.']||'').replace("'-",''),
+        'Prazo proc. adm.':        String(r['Prazo proc. adm.']||'').replace("'-",''),
+      }
+    };
+  });
+}
+
+
+/* ══ SALVAR ══ */
+async function salvarDia(){
+  if(!diaSel)return;
+  const btn=document.getElementById('btn-salvar');
+  btn.textContent='⏳ Salvando…';btn.classList.add('loading');
+  try{
+    const insertedDate=iso(new Date());
+    // ── Merge CONSUMIDOR + Detalhes ──────────────────────────
+    if (stLocal.consumidor && stLocal.cons_det) {
+      const detMapC = {};
+      stLocal.cons_det.rows.forEach(d => {
+        const p = String(d.protocolo||'').trim();
+        if(p) detMapC[p] = d;
+      });
+      stLocal.consumidor.rows = stLocal.consumidor.rows.map(r => {
+        const p = String(r.numero||'').trim();
+        const det = detMapC[p];
+        if(!det) return r;
+        return {
+          ...r,
+          cpf:         det.cpf         || r.cpf,
+          safra:       det.safra        || r.safra,
+          descricao:   det.descricao    || r.descricao,
+          // Tipo de produto vai para extra2
+          extra2:      det.tipo_produto || r.extra2,
+          dados_raw:   { ...r.dados_raw,
+            'Tipo de produto':        det.tipo_produto||'',
+            'Safra contrato':         det.safra||'',
+            'Descrição da reclamação':det.descricao||'',
+          },
+        };
+      });
+    }
+
+    // ── Merge BACEN + Detalhes ────────────────────────────
+    if (stLocal.rdr && stLocal.rdr_det) {
+      const detMap = {};
+      stLocal.rdr_det.rows.forEach(d => {
+        const num = String(d.numero).trim();
+        if (num) detMap[num] = d;
+      });
+      stLocal.rdr.rows = stLocal.rdr.rows.map(r => {
+        const num = String(r.numero).trim();
+        const det = detMap[num];
+        if (!det) return r;
+        return {
+          ...r,
+          cpf:      det.cpf      || r.cpf,
+          demanda:  det.demanda  || r.demanda,
+          status:   det.status   || r.status,
+          safra:    det.safra    || r.safra,
+          extra1:   det.extra1   || r.extra1,
+          extra2:   det.extra2   || r.extra2,
+          dados_raw: { ...r.dados_raw, ...det.dados_raw },
+        };
+      });
+    }
+
+    for(const canal of['rdr','consumidor','procon']){
+      if(!stLocal[canal])continue;
+      const rows=stLocal[canal].rows;
+
+      // ── Agrupa registros pela data de captura de cada um ──
+      // A data_ref de cada registro vem do campo "abertura" (Data de captura)
+      // Se não tiver data válida, usa o dia selecionado no calendário como fallback
+      const extrairDataRef=(abertura)=>{
+        // abertura já vem em DD/MM/AAAA ou DD/MM/AAAA HH:MM do toBR()
+        if(!abertura||abertura==='—')return diaSel;
+        const s=String(abertura).trim();
+        const b=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+        if(b)return`${b[3]}-${b[2]}-${b[1]}`;
+        const i=s.match(/^(\d{4}-\d{2}-\d{2})/);
+        if(i)return i[1];
+        return diaSel;
+      };
+
+      // Agrupa rows por data_ref real
+      const porData={};
+      rows.forEach(r=>{
+        const dr=extrairDataRef(r.abertura);
+        if(!porData[dr])porData[dr]=[];
+        porData[dr].push(r);
+      });
+
+      // Cria um upload_record por data + salva demandas com data_ref correta
+      for(const [dataRef,rowsData] of Object.entries(porData)){
+        const upResp = await fetch(`${SB_URL}/rest/v1/canais_criticos_uploads`,{
+          method:'POST',
+          headers:{...H,'Prefer':'return=representation'},
+          body:JSON.stringify({canal,data_ref:dataRef,arquivo:stLocal[canal].fileName||'',total:rowsData.length})
+        });
+        if(!upResp.ok){
+          const t=await upResp.text();
+          throw new Error('Upload registro: '+t.slice(0,100));
+        }
+        const up = await upResp.json();
+        const uploadId=up[0]?.id;
+        if(!uploadId) throw new Error('Upload sem ID retornado — verifique RLS do Supabase');
+        for(let i=0;i<rowsData.length;i+=100){
+          const lote=rowsData.slice(i,i+100).map(r=>{
+            // Limpar dados_raw — só salva se for objeto válido
+            let dr = null;
+            if(r.dados_raw && typeof r.dados_raw === 'object' && Object.keys(r.dados_raw).length){
+              // Truncar textos muito longos para não estourar limite
+              const drClean = {};
+              for(const [k,v] of Object.entries(r.dados_raw)){
+                drClean[k] = String(v||'').slice(0,500);
+              }
+              dr = drClean;
+            }
+            return {
+              upload_id:   uploadId,
+              canal,
+              data_ref:    dataRef,
+              inserted_date: insertedDate,
+              numero:      String(r.numero||''),
+              demandante:  String(r.demandante||''),
+              cpf:         String(r.cpf||''),
+              abertura:    String(r.abertura||''),
+              prazo:       String(r.prazo||''),
+              demanda:     String(r.demanda||''),
+              status:      String(r.status||''),
+              safra:       String(r.safra||''),
+              extra1:      String(r.extra1||''),
+              extra2:      String(r.extra2||''),
+              descricao:   String(r.descricao||'').slice(0,1000),
+              colaborador: String(r.colaborador||''),
+              dados_raw:   dr,
+            };
+          });
+          const resp = await fetch(`${SB_URL}/rest/v1/canais_criticos_demandas`,{
+            method:'POST',
+            headers:{...H,'Prefer':'return=minimal'},
+            body:JSON.stringify(lote)
+          });
+          if(!resp.ok){
+            const errTxt = await resp.text();
+            console.error('Erro Supabase:', resp.status, errTxt);
+            throw new Error(`Supabase ${resp.status}: ${errTxt.slice(0,200)}`);
+          }
+        }
+      }
+    }
+    toast('✅ Dados salvos com sucesso!','ok');
+    stLocal={rdr:null,consumidor:null,procon:null,rdr_det:null,cons_det:null};
+    resetSlots();
+    await carregarDados();
+    // carregarDados já chama atualizarSlotsDosBanco
+  }catch(e){
+    const msg = e.message||String(e);
+    toast('❌ Erro: '+msg.slice(0,80),'err');
+    console.error('salvarDia erro:', e);
+  }
+  finally{
+    const b=document.getElementById('btn-salvar');
+    if(b){b.classList.remove('loading','ready');b.textContent='💾 Salvar e publicar';}
+  }
+}
+
+/* ══ UTILS ══ */
+function iso(d){return`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;}
+function pd(v){
+  if(!v)return null;
+  if(v instanceof Date)return new Date(v);
+  const s=String(v).trim();
+  const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+  if(m)return new Date(+m[3],+m[2]-1,+m[1]);
+  const d=new Date(s);return isNaN(d)?null:d;
+}
+const fd=d=>d?d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
+
+let tt=null;
+function toast(msg,tipo='info'){
+  const el=document.getElementById('toast');
+  el.textContent=msg;el.className=`toast show ${tipo==='ok'?'ok':tipo==='err'?'err':''}`;
+  clearTimeout(tt);if(tipo!=='info')tt=setTimeout(()=>el.className='toast',3500);
+}
+
+/* ══ PAINEL VISÃO GERAL ══ */
+function togglePainelGeral(){
+  const ov=document.getElementById('pg-overlay');
+  const btn=document.getElementById('pg-btn');
+  if(ov.classList.contains('show')){ov.classList.remove('show');btn.classList.remove('ativo');}
+  else{renderPainelGeral();ov.classList.add('show');btn.classList.add('ativo');}
+}
+function fecharPg(){
+  document.getElementById('pg-overlay').classList.remove('show');
+  document.getElementById('pg-btn').classList.remove('ativo');
+}
+function fecharPgFora(e){if(e.target===document.getElementById('pg-overlay'))fecharPg();}
+
+function renderPainelGeral(){
+  const content=document.getElementById('pg-content');
+  const total=todasDemandas.length;
+  if(!total){content.innerHTML='<p style="font-size:12px;color:var(--ink3);text-align:center;padding:32px 0">Nenhum dado salvo ainda.<br>Annexe e salve os arquivos para ver os indicadores.</p>';return;}
+  const hoje=new Date();hoje.setHours(0,0,0,0);
+  const in3=new Date(hoje);in3.setDate(in3.getDate()+3);
+  const tr=todasDemandas.filter(d=>d.canal==='rdr').length;
+  const tc=todasDemandas.filter(d=>d.canal==='consumidor').length;
+  const tp=todasDemandas.filter(d=>d.canal==='procon').length;
+  let venc=0,urg=0,okQt=0;
+  const demC={};
+  const pc={rdr:{ok:0,v:0},consumidor:{ok:0,v:0},procon:{ok:0,v:0}};
+  todasDemandas.forEach(d=>{
+    if(d.demanda)demC[d.demanda]=(demC[d.demanda]||0)+1;
+    const p=pd(d.prazo);if(!p){okQt++;return;}
+    p.setHours(0,0,0,0);
+    if(p<hoje){
+      if(isEncerrado(d)){okQt++;if(pc[d.canal])pc[d.canal].ok++;}
+      else{venc++;if(pc[d.canal])pc[d.canal].v++;}
+    }
+    else if(p<=in3)urg++;
+    else{okQt++;if(pc[d.canal])pc[d.canal].ok++;}
+  });
+  const pVenc=total?Math.round(venc/total*100):0;
+  const pOk=total?Math.round(okQt/total*100):0;
+  const pRdr=total?Math.round(tr/total*100):0;
+  const pCon=total?Math.round(tc/total*100):0;
+  const pPro=total?Math.round(tp/total*100):0;
+  const dias=Object.keys(dadosPorDia).length;
+  const nPRdr=tr?Math.round(pc.rdr.ok/tr*100):0;
+  const nPCon=tc?Math.round(pc.consumidor.ok/tc*100):0;
+  const nPPro=tp?Math.round(pc.procon.ok/tp*100):0;
+  const ativo=tr>=tc&&tr>=tp?'RDR — BACEN':tc>=tp?'Consumidor.gov.br':'PROCON';
+  const score=Math.max(0,100-pVenc*2-(urg>0?5:0));
+  const gc=v=>v>=80?'#166534':v>=50?'#b45309':'#c0392b';
+  const topDem=Object.entries(demC).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxD=topDem[0]?.[1]||1;
+
+  content.innerHTML=`
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
+      ${[['Saúde geral',score,score>=80?'Sob controle':score>=50?'Atenção':'Crítico'],
+         ['Dentro do prazo',pOk,okQt+' de '+total],
+         ['Vencidos',pVenc,venc+' demanda(s)']
+        ].map(([lbl,v,sub])=>`
+        <div style="background:var(--paper);border-radius:var(--r);padding:12px 14px">
+          <div style="font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${lbl}</div>
+          <div style="font-size:26px;font-weight:700;color:${gc(lbl==='Vencidos'?100-v:v)};line-height:1;margin-bottom:4px">${v}%</div>
+          <div style="height:4px;background:rgba(0,0,0,.06);border-radius:2px;overflow:hidden;margin-bottom:5px"><div style="height:100%;width:${v}%;background:${gc(lbl==='Vencidos'?100-v:v)};border-radius:2px"></div></div>
+          <div style="font-size:10px;color:var(--ink3)">${sub}</div>
+        </div>`).join('')}
+    </div>
+
+    <div class="pg-section">
+      <div class="pg-section-title">Status por canal</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
+        ${[['rdr','🏦 RDR — BACEN',tr,nPRdr,pRdr],['consumidor','💬 Consumidor.gov.br',tc,nPCon,pCon],['procon','⚖️ PROCON',tp,nPPro,pPro]].map(([c,n,qt,np,pt])=>`
+        <div style="background:var(--${c}-bg);border-radius:var(--r);padding:12px 14px">
+          <div style="font-size:10px;font-weight:600;color:var(--${c});margin-bottom:6px">${n}</div>
+          <div style="font-size:24px;font-weight:700;color:var(--${c});line-height:1">${qt}</div>
+          <div style="font-size:10px;color:var(--${c});margin-top:3px;font-weight:500">${qt>0?np+'% no prazo':'—'}</div>
+          <div style="font-size:9px;color:var(--ink3);margin-top:1px">${pt}% do total</div>
+        </div>`).join('')}
+      </div>
+      <div style="position:relative;height:120px"><canvas id="pg-chart"></canvas></div>
+    </div>
+
+    <div class="pg-section">
+      <div class="pg-section-title">Indicadores operacionais</div>
+      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:7px">
+        ${[
+          ['Total acumulado',''+total,'','registros · '+dias+' dia(s)'],
+          ['Canal mais ativo',ativo,'','maior volume: '+Math.max(tr,tc,tp)],
+          ['Vencendo em 3 dias',''+urg,urg===0?'ok':urg<=3?'warn':'danger',urg===0?'OK':urg<=3?'Atenção':'Crítico'],
+          ['Taxa de conformidade',pOk+'%',pOk>=90?'ok':pOk>=70?'warn':'danger',(pOk>=90?'Bom':pOk>=70?'Regular':'Ruim')+' (meta ≥90%)'],
+          ['Prazos vencidos',''+venc,venc===0?'ok':pVenc<=10?'warn':'danger',venc===0?'Nenhum':pVenc+'% do total'],
+          ['Dias com inserção',''+dias,dias>=5?'ok':dias>=2?'warn':'danger',dias>=5?'Regular':'Inserções escassas'],
+        ].map(([lbl,val,st,txt])=>`
+        <div style="background:var(--paper);border-radius:var(--r);padding:10px 12px">
+          <div style="font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">${lbl}</div>
+          <div style="font-size:18px;font-weight:700;color:${st==='ok'?'var(--ok)':st==='warn'?'var(--warn)':st==='danger'?'var(--danger)':'var(--ink)'};line-height:1;margin-bottom:3px">${val}</div>
+          ${st?'<span style="font-size:9px;font-weight:600;padding:2px 5px;border-radius:3px;background:var(--'+st+'-bg);color:var(--'+st+')">'+txt+'</span>':'<div style="font-size:9px;color:var(--ink3)">'+txt+'</div>'}
+        </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="pg-section">
+      <div class="pg-section-title">Top demandas por tipo</div>
+      ${topDem.map(([nome,qtd])=>`
+        <div class="dem-row">
+          <div class="dem-nome" title="${nome}">${nome}</div>
+          <div class="dem-barra"><div class="dem-fill" style="width:${Math.round(qtd/maxD*100)}%;background:var(--rdr)"></div></div>
+          <div class="dem-num">${qtd} <span style="color:var(--ink3);font-size:9px">(${Math.round(qtd/total*100)}%)</span></div>
+        </div>`).join('')}
+    </div>`;
+
+  requestAnimationFrame(()=>{
+    const ctx=document.getElementById('pg-chart');if(!ctx)return;
+    if(window._pgC)window._pgC.destroy();
+    window._pgC=new Chart(ctx,{type:'bar',
+      data:{labels:['RDR — BACEN','Consumidor.gov.br','PROCON'],
+        datasets:[
+          {label:'No prazo',data:[pc.rdr.ok,pc.consumidor.ok,pc.procon.ok],backgroundColor:'#166534',borderRadius:4},
+          {label:'Vencidos',data:[pc.rdr.v,pc.consumidor.v,pc.procon.v],backgroundColor:'#c0392b',borderRadius:4},
+        ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{display:true,position:'top',labels:{font:{size:9},boxWidth:8,padding:5}}},
+        scales:{x:{grid:{display:false},ticks:{font:{size:10}}},y:{grid:{color:'rgba(0,0,0,.04)'},ticks:{font:{size:9},stepSize:1}}}}
+    });
+  });
+}
+
+</script>
+
+<!-- MODAL CONFIRMAÇÃO EXCLUSÃO -->
+<div class="modal-overlay" id="modal-overlay" onclick="fecharModal(event)">
+  <div class="modal-box">
+    <h3 id="modal-title">🗑 Excluir dados</h3>
+    <p id="modal-msg">Tem certeza que deseja excluir esses registros? Esta ação não pode ser desfeita.</p>
+    <div class="modal-actions">
+      <button class="btn-modal-cancel" onclick="fecharModalBtn()">Cancelar</button>
+      <button class="btn-modal-confirm" id="modal-confirm-btn" onclick="confirmarExclusao()">Sim, excluir</button>
+    </div>
+  </div>
+</div>
+
+<!-- PAINEL GERAL -->
+<div class="pg-overlay" id="pg-overlay" onclick="fecharPgFora(event)">
+  <div class="pg-panel" id="pg-panel">
+    <div class="pg-panel-head">
+      <h2>📊 Visão Geral do Dashboard</h2>
+      <button class="pg-close" onclick="fecharPg()">✕</button>
+    </div>
+    <div id="pg-content">
+      <p style="font-size:12px;color:var(--ink3);text-align:center;padding:24px 0">Carregando indicadores…</p>
+    </div>
+  </div>
+</div>
+<div style="position:fixed;bottom:20px;right:20px;background:#1a56db;color:#eff4ff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none">MODO DEMO</div></body>
+</html>
