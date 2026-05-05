@@ -368,6 +368,12 @@ tr:hover td{background:#fafaf8}
 </head>
 <body>
 
+<!-- BANNER MODO DEMO -->
+<div style="background:#F59E0B;color:#1C1917;text-align:center;padding:7px 16px;font-size:12px;font-weight:700;letter-spacing:0.3px;position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-content:center;gap:10px;">
+  <span>⚠ MODO DEMO</span>
+  <span style="font-weight:400;opacity:0.8">— Dados fictícios para demonstração. Nenhuma informação real é exibida.</span>
+</div>
+
 <!-- HEADER -->
 <div class="hdr">
   <div class="hbrand">
@@ -570,8 +576,8 @@ window.addEventListener('DOMContentLoaded',async()=>{
 
 async function carregarDados(){
   try{
-    // MODO DEMO: sem credenciais, dados do banco não carregados
-    if(!SB_URL || !SB_KEY) { console.log('Modo demo: banco desabilitado'); return; }
+    // MODO DEMO: sem credenciais, carrega dados fictícios
+    if(!SB_URL || !SB_KEY) { carregarDadosMock(); return; }
     // Paginação: Supabase limita 1000 linhas por request
     // Busca em páginas de 1000 até trazer tudo
     const SELECT = 'id,canal,data_ref,inserted_date,numero,demandante,cpf,abertura,prazo,demanda,status,safra,extra1,extra2,descricao,colaborador';
@@ -602,6 +608,66 @@ async function carregarDados(){
   }catch(e){console.warn('carregarDados:',e.message);toast('⚠ Sem conexão com banco','err');}
 }
 
+
+/* ══ DADOS FICTÍCIOS PARA DEMO ══ */
+function carregarDadosMock(){
+  const nomes=['C. Andrade','P. Lima','R. Souza','M. Ferreira','J. Oliveira','A. Santos','F. Costa','L. Pereira','T. Alves','S. Rodrigues','B. Martins','G. Nunes','V. Carvalho','D. Nascimento','E. Barbosa'];
+  const colabs=['Demo Analista','Demo Coord.','Demo Gestor'];
+  const safras=['2025-10','2025-11','2025-12','2026-01','2026-02','2026-03'];
+  const statusList=['Pendente','Em análise','Respondido','Encerrado','Prazo vencido'];
+  const demandasRDR=['Portabilidade de saída','Cópia do contrato','Desconhece operação','Extrato/DED','Blacklist'];
+  const demandasCons=['Juros abusivos','Solicita refinanciamento','Valores a receber','Refinanciamento cancelado'];
+  const demandasProcon=['Cobrança indevida','Negativação indevida','Falha na prestação','Cláusula abusiva'];
+
+  function rnd(arr){return arr[Math.floor(Math.random()*arr.length)];}
+  function fmtDate(d){return d.toISOString().slice(0,10);}
+  function addDias(base,n){const d=new Date(base);d.setDate(d.getDate()+n);return d;}
+
+  const base=new Date('2026-01-06');
+  let id=1;
+  const mock=[];
+
+  // Gera registros espalhados em Jan-Abr 2026
+  const config=[
+    {canal:'rdr',      qtd:32, demandas:demandasRDR},
+    {canal:'consumidor',qtd:24, demandas:demandasCons},
+    {canal:'procon',   qtd:18, demandas:demandasProcon},
+  ];
+  config.forEach(({canal,qtd,demandas})=>{
+    for(let i=0;i<qtd;i++){
+      const dataRef=addDias(base, Math.floor(Math.random()*110));
+      const abertura=addDias(dataRef,-Math.floor(Math.random()*5));
+      const prazo=addDias(dataRef, 10+Math.floor(Math.random()*20));
+      mock.push({
+        id:id++,
+        canal,
+        data_ref:fmtDate(dataRef),
+        inserted_date:fmtDate(dataRef),
+        numero:`${canal.toUpperCase().slice(0,3)}-DEMO-${String(id).padStart(4,'0')}`,
+        demandante:rnd(nomes),
+        cpf:'***.***.***.00',
+        abertura:fmtDate(abertura),
+        prazo:fmtDate(prazo),
+        demanda:rnd(demandas),
+        status:rnd(statusList),
+        safra:rnd(safras),
+        extra1:'Demo',extra2:'Demo',
+        descricao:'Registro de demonstração — dados fictícios.',
+        colaborador:rnd(colabs),
+      });
+    }
+  });
+
+  todasDemandas=mock;
+  dadosPorDia={};
+  todasDemandas.forEach(d=>{
+    const k=d.data_ref;if(!k)return;
+    if(!dadosPorDia[k])dadosPorDia[k]={rdr:[],consumidor:[],procon:[]};
+    dadosPorDia[k][d.canal]?.push(d);
+  });
+  renderCal();
+  atualizarSomatoria();
+}
 
 /* Mostra no slot quantos registros estão salvos no banco por canal */
 function atualizarSlotsDosBanco(){
