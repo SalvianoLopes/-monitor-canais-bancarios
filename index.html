@@ -1920,5 +1920,7 @@ function renderPainelGeral(){
     </div>
   </div>
 </div>
-<div style="position:fixed;bottom:20px;right:20px;background:#1a56db;color:#eff4ff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none">MODO DEMO</div></body>
+<div id="badge-demo" style="display:none;position:fixed;bottom:20px;right:20px;background:#1a56db;color:#eff4ff;padding:5px 14px;border-radius:20px;font-size:11px;font-weight:700;letter-spacing:.5px;z-index:9999;box-shadow:0 2px 8px rgba(0,0,0,.25);pointer-events:none">MODO DEMO</div>
+<script>if(!window._REAL){var bd=document.getElementById('badge-demo');if(bd)bd.style.display='block';}</script>
+</body>
 </html>
