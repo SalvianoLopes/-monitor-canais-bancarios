@@ -368,8 +368,8 @@ tr:hover td{background:#fafaf8}
 </head>
 <body>
 
-<!-- BANNER MODO DEMO -->
-<div style="background:#F59E0B;color:#1C1917;text-align:center;padding:7px 16px;font-size:12px;font-weight:700;letter-spacing:0.3px;position:sticky;top:0;z-index:200;display:flex;align-items:center;justify-content:center;gap:10px;">
+<!-- BANNER MODO DEMO — só aparece fora do domínio real -->
+<div id="banner-demo" style="display:none;background:#F59E0B;color:#1C1917;text-align:center;padding:7px 16px;font-size:12px;font-weight:700;letter-spacing:0.3px;position:sticky;top:0;z-index:200;align-items:center;justify-content:center;gap:10px;">
   <span>⚠ MODO DEMO</span>
   <span style="font-weight:400;opacity:0.8">— Dados fictícios para demonstração. Nenhuma informação real é exibida.</span>
 </div>
@@ -519,8 +519,10 @@ tr:hover td{background:#fafaf8}
 
 <script>
 /* ══ SUPABASE ══ */
-const SB_URL='';
-const SB_KEY='';
+const _REAL=window.location.hostname==='canais-criticos.vercel.app';
+const SB_URL=_REAL?'https://yaaoisqyxfqocrnlymjm.supabase.co':'';
+const SB_KEY=_REAL?'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhYW9pc3F5eGZxb2Nybmx5bWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NjkxNjYsImV4cCI6MjA4NjQ0NTE2Nn0.GffNyO_nYJZKkACJsaX2AuHOkh0kOa58-b3fnMgaixg':'';
+if(!_REAL){const b=document.getElementById('banner-demo');if(b){b.style.display='flex';}}
 const H={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`};
 const sbGet=(t,p='')=>{
   const c=new AbortController();
