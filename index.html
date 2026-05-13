@@ -888,7 +888,7 @@ function buildScoreConsumidor(){
   const total=todos.length;
   const resolvidas=todos.filter(r=>{
     const s=String(r.status||'').toLowerCase();
-    return s.includes('encerrada')||s.includes('finalizada');
+    return s.includes('encerrada')||s.includes('finalizada')||s.includes('resolvida');
   }).length;
   const resolucaoPct=total?(resolvidas/total*100):0;
   const score=total?(resolvidas/total*5):0;
@@ -896,15 +896,20 @@ function buildScoreConsumidor(){
   const resolucaoStr=resolucaoPct.toFixed(1);
   const barPct=Math.round(score/5*100);
   const corClass=score>=4?'var(--ok)':score>=3?'var(--warn)':'var(--danger)';
-  // Respondidas = com status não vazio / não pendente
   const respondidas=todos.filter(r=>{
     const s=String(r.status||'').toLowerCase().trim();
     return s&&s!=='—'&&!s.includes('pendente')&&!s.includes('sem status');
   }).length;
   const respPct=total?(respondidas/total*100).toFixed(1):'0.0';
+  // Nota média dos avaliados (extra1)
+  const comNota=todos.filter(r=>r.extra1&&!isNaN(parseFloat(r.extra1)));
+  const notaMedia=comNota.length?(comNota.reduce((a,r)=>a+parseFloat(r.extra1),0)/comNota.length):null;
+  const notaStr=notaMedia?notaMedia.toFixed(2):null;
+  const notaCor=notaMedia>=4?'var(--ok)':notaMedia>=3?'var(--warn)':'var(--danger)';
+  const estrelas=notaMedia?'★'.repeat(Math.round(notaMedia))+'☆'.repeat(5-Math.round(notaMedia)):'';
   return`<div style="background:var(--cons-bg);border:1px solid rgba(11,122,94,.18);border-radius:var(--r);padding:12px 14px;margin-bottom:10px">
     <div style="font-size:9px;font-weight:700;color:var(--cons);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px">📊 Indicador Consumidor.gov.br — Acumulado total</div>
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;align-items:end">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;align-items:end">
       <div>
         <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Score estimado</div>
         <div style="font-size:24px;font-weight:700;color:${corClass};line-height:1">${scoreStr}<span style="font-size:12px;color:var(--ink3);font-weight:400">/5 ⭐</span></div>
@@ -913,13 +918,19 @@ function buildScoreConsumidor(){
       <div>
         <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Resolução</div>
         <div style="font-size:24px;font-weight:700;color:var(--cons);line-height:1">${resolucaoStr}<span style="font-size:12px;font-weight:400">%</span></div>
-        <div style="font-size:9px;color:var(--ink3);margin-top:3px">${resolvidas} enc/final de ${total}</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:3px">${resolvidas} resolvidos de ${total}</div>
       </div>
       <div>
         <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Respondidas</div>
         <div style="font-size:24px;font-weight:700;color:var(--ink);line-height:1">${respPct}<span style="font-size:12px;font-weight:400">%</span></div>
         <div style="font-size:9px;color:var(--ink3);margin-top:3px">${respondidas} de ${total}</div>
       </div>
+      ${notaStr?`<div>
+        <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Nota média</div>
+        <div style="font-size:24px;font-weight:700;color:${notaCor};line-height:1">${notaStr}<span style="font-size:12px;color:var(--ink3);font-weight:400">/5</span></div>
+        <div style="font-size:10px;color:${notaCor};margin-top:3px">${estrelas}</div>
+        <div style="font-size:9px;color:var(--ink3);margin-top:1px">${comNota.length} avaliados</div>
+      </div>`:''}
       <div>
         <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Total banco</div>
         <div style="font-size:24px;font-weight:700;color:var(--ink);line-height:1">${total}</div>
