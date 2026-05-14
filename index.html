@@ -1757,8 +1757,12 @@ function pd(v){
   if(!v)return null;
   if(v instanceof Date)return new Date(v);
   const s=String(v).trim();
+  // DD/MM/YYYY
   const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
   if(m)return new Date(+m[3],+m[2]-1,+m[1]);
+  // YYYY-MM-DD (ISO do Supabase) — usar construtor local, nao UTC, para evitar fuso UTC-3
+  const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if(iso)return new Date(+iso[1],+iso[2]-1,+iso[3]);
   const d=new Date(s);return isNaN(d)?null:d;
 }
 const fd=d=>d?d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
