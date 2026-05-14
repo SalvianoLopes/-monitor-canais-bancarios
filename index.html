@@ -1772,7 +1772,7 @@ function addDiasUteis(base,n){
 }
 /* Prazo efetivo: consumidor = data_ref + 10 dias úteis; demais = campo prazo do banco */
 function prazoEfetivo(r){
-  if(r.canal==='consumidor'){
+  if(r.canal==='consumidor'||r.canal==='procon'){
     const base=pd(r.data_ref||r.abertura);
     if(!base)return null;
     return addDiasUteis(base,10);
