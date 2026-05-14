@@ -840,7 +840,7 @@ function renderDiaDados(ds){
   // KPIs gerais do dia
   let venc=0,urg=0,ok=0;
   allRows.forEach(r=>{
-    const p=pd(r.prazo);
+    const p=prazoEfetivo(r);
     if(!p){ok++;return;}
     p.setHours(0,0,0,0);
     if(p<today){if(isEncerrado(r))ok++;else venc++;}
@@ -973,7 +973,7 @@ function buildCanalPanel(canal,rows,today,in3){
     const dem=r.demanda||'—',st=r.status||'Sem status';
     demC[dem]=(demC[dem]||0)+1;
     stC[st]=(stC[st]||0)+1;
-    const prazo=pd(r.prazo);
+    const prazo=prazoEfetivo(r);
     if(prazo){
       prazo.setHours(0,0,0,0);
       let b='o';
@@ -1763,6 +1763,23 @@ function pd(v){
 }
 const fd=d=>d?d.toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit',year:'numeric'}):'—';
 
+/* Adiciona n dias úteis (pula sáb/dom) */
+function addDiasUteis(base,n){
+  const d=new Date(base);
+  let added=0;
+  while(added<n){d.setDate(d.getDate()+1);const dow=d.getDay();if(dow!==0&&dow!==6)added++;}
+  return d;
+}
+/* Prazo efetivo: consumidor = data_ref + 10 dias úteis; demais = campo prazo do banco */
+function prazoEfetivo(r){
+  if(r.canal==='consumidor'){
+    const base=pd(r.data_ref||r.abertura);
+    if(!base)return null;
+    return addDiasUteis(base,10);
+  }
+  return pd(r.prazo);
+}
+
 let tt=null;
 function toast(msg,tipo='info'){
   const el=document.getElementById('toast');
@@ -1797,7 +1814,7 @@ function renderPainelGeral(){
   const pc={rdr:{ok:0,v:0},consumidor:{ok:0,v:0},procon:{ok:0,v:0}};
   todasDemandas.forEach(d=>{
     if(d.demanda)demC[d.demanda]=(demC[d.demanda]||0)+1;
-    const p=pd(d.prazo);if(!p){okQt++;return;}
+    const p=prazoEfetivo(d);if(!p){okQt++;return;}
     p.setHours(0,0,0,0);
     if(p<hoje){
       if(isEncerrado(d)){okQt++;if(pc[d.canal])pc[d.canal].ok++;}
