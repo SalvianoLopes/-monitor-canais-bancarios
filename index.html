@@ -827,9 +827,9 @@ function renderDiaDados(ds){
   // Mescla dados do banco + dados locais ainda não salvos
   const banco=dadosPorDia[ds]||{rdr:[],consumidor:[],procon:[]};
   const dia={
-    rdr:       [...banco.rdr,       ...(stLocal.rdr?.rows?.map(r=>({...r,_local:true}))||[])],
-    consumidor:[...banco.consumidor,...(stLocal.consumidor?.rows?.map(r=>({...r,_local:true}))||[])],
-    procon:    [...banco.procon,    ...(stLocal.procon?.rows?.map(r=>({...r,_local:true}))||[])],
+    rdr:       [...banco.rdr,       ...(stLocal.rdr?.rows?.map(r=>({...r,canal:'rdr',_local:true}))||[])],
+    consumidor:[...banco.consumidor,...(stLocal.consumidor?.rows?.map(r=>({...r,canal:'consumidor',_local:true}))||[])],
+    procon:    [...banco.procon,    ...(stLocal.procon?.rows?.map(r=>({...r,canal:'procon',_local:true}))||[])],
   };
   const today=new Date();today.setHours(0,0,0,0);
   const in3=new Date(today);in3.setDate(in3.getDate()+3);
