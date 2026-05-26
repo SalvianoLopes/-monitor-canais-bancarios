@@ -1690,15 +1690,15 @@ async function salvarDia(){
         const up = await upResp.json();
         const uploadId=up[0]?.id;
         if(!uploadId) throw new Error('Upload sem ID retornado — verifique RLS do Supabase');
-        for(let i=0;i<rowsData.length;i+=100){
-          const lote=rowsData.slice(i,i+100).map(r=>{
+        for(let i=0;i<rowsData.length;i+=20){
+          const lote=rowsData.slice(i,i+20).map(r=>{
             // Limpar dados_raw — só salva se for objeto válido
             let dr = null;
             if(r.dados_raw && typeof r.dados_raw === 'object' && Object.keys(r.dados_raw).length){
               // Truncar textos muito longos para não estourar limite
               const drClean = {};
               for(const [k,v] of Object.entries(r.dados_raw)){
-                drClean[k] = String(v||'').slice(0,500);
+                drClean[k] = String(v||'').slice(0,300);
               }
               dr = drClean;
             }
