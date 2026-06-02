@@ -837,29 +837,16 @@ function renderDiaDados(ds){
   const allRows=[...dia.rdr,...dia.consumidor,...dia.procon];
   const total=allRows.length;
 
-  // KPIs gerais do dia
-  let venc=0,urg=0,ok=0;
-  allRows.forEach(r=>{
-    const p=prazoEfetivo(r);
-    if(!p){ok++;return;}
-    p.setHours(0,0,0,0);
-    if(p<today){if(isEncerrado(r))ok++;else venc++;}
-    else if(p<=in3)urg++;
-    else ok++;
-  });
-
   const [y,m,d]=ds.split('-');
   const lbl=`${d}/${m}/${y}`;
 
   const area=document.getElementById('data-area');
   area.innerHTML=`
-    ${venc>0?`<div class="alert danger">⚠ ${venc} demanda(s) com prazo VENCIDO neste dia.</div>`:''}
-    ${urg>0?`<div class="alert warn">⏰ ${urg} demanda(s) vencendo em 3 dias.</div>`:''}
     <div class="kpi-row">
       <div class="kpi"><div class="kpi-lbl">Total do dia</div><div class="kpi-val" style="color:var(--ink)">${total}</div><div class="kpi-sub">${lbl}</div></div>
-      <div class="kpi"><div class="kpi-lbl">Vencendo (3d)</div><div class="kpi-val warn">${urg}</div><div class="kpi-sub">requer atenção</div></div>
-      <div class="kpi"><div class="kpi-lbl">Vencidos</div><div class="kpi-val danger">${venc}</div><div class="kpi-sub">prazo expirado</div></div>
-      <div class="kpi"><div class="kpi-lbl">Dentro do prazo</div><div class="kpi-val ok">${ok}</div><div class="kpi-sub">sem urgência</div></div>
+      <div class="kpi"><div class="kpi-lbl">RDR — BACEN</div><div class="kpi-val" style="color:#1a56db">${dia.rdr.length}</div><div class="kpi-sub">registros</div></div>
+      <div class="kpi"><div class="kpi-lbl">Consumidor.gov.br</div><div class="kpi-val" style="color:#0b7a5e">${dia.consumidor.length}</div><div class="kpi-sub">registros</div></div>
+      <div class="kpi"><div class="kpi-lbl">PROCON</div><div class="kpi-val" style="color:#7c3aed">${dia.procon.length}</div><div class="kpi-sub">registros</div></div>
     </div>
     <div class="ctabs">
       <button class="ctab active" data-c="rdr" onclick="trocarTab('rdr',this)"><span class="pip"></span>RDR — BACEN (${dia.rdr.length})</button>
@@ -967,30 +954,21 @@ function buildCanalPanel(canal,rows,today,in3){
   const temLocal=rows.some(r=>r._local);
   const bannerLocal=temLocal?`<div style="background:#fffbeb;border:1px solid rgba(180,83,9,.2);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;font-weight:500;color:#b45309;display:flex;align-items:center;gap:6px;">⚠ Dados locais — clique em <strong>Salvar e publicar</strong> para confirmar</div>`:'';
 
-  let venc=0,urg=0,ok=0;
-  const demC={},stC={},prazos=[];
+  const demC={},stC={};
+  let enc=0;
   rows.forEach(r=>{
     const dem=r.demanda||'—',st=r.status||'Sem status';
     demC[dem]=(demC[dem]||0)+1;
     stC[st]=(stC[st]||0)+1;
-    const prazo=prazoEfetivo(r);
-    if(prazo){
-      prazo.setHours(0,0,0,0);
-      let b='o';
-      if(prazo<today){venc++;b='v';}
-      else if(prazo<=in3){urg++;b='u';}
-      else ok++;
-      prazos.push({nome:r.demandante,prazo,b});
-    }else ok++;
+    if(isEncerrado(r))enc++;
   });
-  prazos.sort((a,b)=>({v:0,u:1,o:2}[a.b]-{v:0,u:1,o:2}[b.b]||a.prazo-b.prazo));
 
-  const prazoH=prazos.slice(0,8).map(p=>`
+  const topSt=Object.entries(stC).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const stH=topSt.map(([st,qt])=>`
     <div class="pl-row">
-      <span class="pl-nome" title="${p.nome}">${p.nome}</span>
-      <span class="pl-data">${fd(p.prazo)}</span>
-      <span class="badge ${p.b}">${{v:'Vencido',u:'Urgente',o:'OK'}[p.b]}</span>
-    </div>`).join('')||'<p style="font-size:10px;color:var(--ink3)">Sem prazos cadastrados</p>';
+      <span class="pl-nome" title="${st}">${st}</span>
+      <span class="pl-data" style="color:var(--ink2);font-size:10px;font-weight:600">${qt}</span>
+    </div>`).join('')||'<p style="font-size:10px;color:var(--ink3)">Sem dados de status</p>';
 
   const ch=Math.max(120,Object.keys(demC).length*30+40);
   const isRdr=canal==='rdr';
@@ -1047,14 +1025,13 @@ function buildCanalPanel(canal,rows,today,in3){
     </div>
     <div class="ckpi-row">
       <div class="kpi"><div class="kpi-lbl">Total</div><div class="kpi-val ${c.cls}">${rows.length}</div><div class="kpi-sub">no canal</div></div>
-      <div class="kpi"><div class="kpi-lbl">Vencendo</div><div class="kpi-val warn">${urg}</div><div class="kpi-sub">3 dias</div></div>
-      <div class="kpi"><div class="kpi-lbl">Vencidos</div><div class="kpi-val danger">${venc}</div><div class="kpi-sub">prazo expirado</div></div>
-      <div class="kpi"><div class="kpi-lbl">No prazo</div><div class="kpi-val ok">${ok}</div><div class="kpi-sub">sem urgência</div></div>
+      <div class="kpi"><div class="kpi-lbl">Encerradas</div><div class="kpi-val ok">${enc}</div><div class="kpi-sub">finalizadas</div></div>
+      <div class="kpi"><div class="kpi-lbl">Em andamento</div><div class="kpi-val" style="color:var(--ink2)">${rows.length-enc}</div><div class="kpi-sub">abertas</div></div>
     </div>
     ${canal==='consumidor'?buildScoreConsumidor():''}
     <div class="cg2">
       <div class="card"><div class="card-t">Demandas por tipo</div><div style="position:relative;height:${ch}px"><canvas id="ch-dem-${canal}"></canvas></div></div>
-      <div class="card"><div class="card-t">Prazos críticos</div>${prazoH}</div>
+      <div class="card"><div class="card-t">Status das entradas</div>${stH}</div>
     </div>
     <div class="cg3">
       <div class="card"><div class="card-t">Recebimentos por data</div><div style="position:relative;height:120px"><canvas id="ch-dat-${canal}"></canvas></div></div>
@@ -1774,15 +1751,7 @@ function addDiasUteis(base,n){
   while(added<n){d.setDate(d.getDate()+1);const dow=d.getDay();if(dow!==0&&dow!==6)added++;}
   return d;
 }
-/* Prazo efetivo: consumidor = data_ref + 10 dias úteis; demais = campo prazo do banco */
-function prazoEfetivo(r){
-  if(r.canal==='consumidor'||r.canal==='procon'){
-    const base=pd(r.data_ref||r.abertura);
-    if(!base)return null;
-    return addDiasUteis(base,10);
-  }
-  return pd(r.prazo);
-}
+function prazoEfetivo(r){ return null; }
 
 let tt=null;
 function toast(msg,tipo='info'){
@@ -1808,63 +1777,40 @@ function renderPainelGeral(){
   const content=document.getElementById('pg-content');
   const total=todasDemandas.length;
   if(!total){content.innerHTML='<p style="font-size:12px;color:var(--ink3);text-align:center;padding:32px 0">Nenhum dado salvo ainda.<br>Annexe e salve os arquivos para ver os indicadores.</p>';return;}
-  const hoje=new Date();hoje.setHours(0,0,0,0);
-  const in3=new Date(hoje);in3.setDate(in3.getDate()+3);
   const tr=todasDemandas.filter(d=>d.canal==='rdr').length;
   const tc=todasDemandas.filter(d=>d.canal==='consumidor').length;
   const tp=todasDemandas.filter(d=>d.canal==='procon').length;
-  let venc=0,urg=0,okQt=0;
   const demC={};
-  const pc={rdr:{ok:0,v:0},consumidor:{ok:0,v:0},procon:{ok:0,v:0}};
   todasDemandas.forEach(d=>{
     if(d.demanda)demC[d.demanda]=(demC[d.demanda]||0)+1;
-    const p=prazoEfetivo(d);if(!p){okQt++;return;}
-    p.setHours(0,0,0,0);
-    if(p<hoje){
-      if(isEncerrado(d)){okQt++;if(pc[d.canal])pc[d.canal].ok++;}
-      else{venc++;if(pc[d.canal])pc[d.canal].v++;}
-    }
-    else if(p<=in3)urg++;
-    else{okQt++;if(pc[d.canal])pc[d.canal].ok++;}
   });
-  const pVenc=total?Math.round(venc/total*100):0;
-  const pOk=total?Math.round(okQt/total*100):0;
   const pRdr=total?Math.round(tr/total*100):0;
   const pCon=total?Math.round(tc/total*100):0;
   const pPro=total?Math.round(tp/total*100):0;
   const dias=Object.keys(dadosPorDia).length;
-  const nPRdr=tr?Math.round(pc.rdr.ok/tr*100):0;
-  const nPCon=tc?Math.round(pc.consumidor.ok/tc*100):0;
-  const nPPro=tp?Math.round(pc.procon.ok/tp*100):0;
   const ativo=tr>=tc&&tr>=tp?'RDR — BACEN':tc>=tp?'Consumidor.gov.br':'PROCON';
-  const score=Math.max(0,100-pVenc*2-(urg>0?5:0));
-  const gc=v=>v>=80?'#166534':v>=50?'#b45309':'#c0392b';
   const topDem=Object.entries(demC).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxD=topDem[0]?.[1]||1;
 
   content.innerHTML=`
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
-      ${[['Saúde geral',score,score>=80?'Sob controle':score>=50?'Atenção':'Crítico'],
-         ['Dentro do prazo',pOk,okQt+' de '+total],
-         ['Vencidos',pVenc,venc+' demanda(s)']
-        ].map(([lbl,v,sub])=>`
+      ${[['🏦 RDR — BACEN','#1a56db',tr,pRdr],['💬 Consumidor.gov.br','#0b7a5e',tc,pCon],['⚖️ PROCON','#7c3aed',tp,pPro]].map(([lbl,cor,qt,pct])=>`
         <div style="background:var(--paper);border-radius:var(--r);padding:12px 14px">
           <div style="font-size:9px;font-weight:700;color:var(--ink3);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">${lbl}</div>
-          <div style="font-size:26px;font-weight:700;color:${gc(lbl==='Vencidos'?100-v:v)};line-height:1;margin-bottom:4px">${v}%</div>
-          <div style="height:4px;background:rgba(0,0,0,.06);border-radius:2px;overflow:hidden;margin-bottom:5px"><div style="height:100%;width:${v}%;background:${gc(lbl==='Vencidos'?100-v:v)};border-radius:2px"></div></div>
-          <div style="font-size:10px;color:var(--ink3)">${sub}</div>
+          <div style="font-size:26px;font-weight:700;color:${cor};line-height:1;margin-bottom:4px">${qt}</div>
+          <div style="height:4px;background:rgba(0,0,0,.06);border-radius:2px;overflow:hidden;margin-bottom:5px"><div style="height:100%;width:${pct}%;background:${cor};border-radius:2px"></div></div>
+          <div style="font-size:10px;color:var(--ink3)">${pct}% do total</div>
         </div>`).join('')}
     </div>
 
     <div class="pg-section">
       <div class="pg-section-title">Status por canal</div>
       <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px">
-        ${[['rdr','🏦 RDR — BACEN',tr,nPRdr,pRdr],['consumidor','💬 Consumidor.gov.br',tc,nPCon,pCon],['procon','⚖️ PROCON',tp,nPPro,pPro]].map(([c,n,qt,np,pt])=>`
+        ${[['rdr','🏦 RDR — BACEN',tr,pRdr],['consumidor','💬 Consumidor.gov.br',tc,pCon],['procon','⚖️ PROCON',tp,pPro]].map(([c,n,qt,pt])=>`
         <div style="background:var(--${c}-bg);border-radius:var(--r);padding:12px 14px">
           <div style="font-size:10px;font-weight:600;color:var(--${c});margin-bottom:6px">${n}</div>
           <div style="font-size:24px;font-weight:700;color:var(--${c});line-height:1">${qt}</div>
-          <div style="font-size:10px;color:var(--${c});margin-top:3px;font-weight:500">${qt>0?np+'% no prazo':'—'}</div>
-          <div style="font-size:9px;color:var(--ink3);margin-top:1px">${pt}% do total</div>
+          <div style="font-size:9px;color:var(--ink3);margin-top:4px">${pt}% do total</div>
         </div>`).join('')}
       </div>
       <div style="position:relative;height:120px"><canvas id="pg-chart"></canvas></div>
@@ -1876,10 +1822,10 @@ function renderPainelGeral(){
         ${[
           ['Total acumulado',''+total,'','registros · '+dias+' dia(s)'],
           ['Canal mais ativo',ativo,'','maior volume: '+Math.max(tr,tc,tp)],
-          ['Vencendo em 3 dias',''+urg,urg===0?'ok':urg<=3?'warn':'danger',urg===0?'OK':urg<=3?'Atenção':'Crítico'],
-          ['Taxa de conformidade',pOk+'%',pOk>=90?'ok':pOk>=70?'warn':'danger',(pOk>=90?'Bom':pOk>=70?'Regular':'Ruim')+' (meta ≥90%)'],
-          ['Prazos vencidos',''+venc,venc===0?'ok':pVenc<=10?'warn':'danger',venc===0?'Nenhum':pVenc+'% do total'],
           ['Dias com inserção',''+dias,dias>=5?'ok':dias>=2?'warn':'danger',dias>=5?'Regular':'Inserções escassas'],
+          ['Total RDR',''+tr,'',''+pRdr+'% do total'],
+          ['Total Consumidor',''+tc,'',''+pCon+'% do total'],
+          ['Total PROCON',''+tp,'',''+pPro+'% do total'],
         ].map(([lbl,val,st,txt])=>`
         <div style="background:var(--paper);border-radius:var(--r);padding:10px 12px">
           <div style="font-size:9px;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">${lbl}</div>
@@ -1905,8 +1851,7 @@ function renderPainelGeral(){
     window._pgC=new Chart(ctx,{type:'bar',
       data:{labels:['RDR — BACEN','Consumidor.gov.br','PROCON'],
         datasets:[
-          {label:'No prazo',data:[pc.rdr.ok,pc.consumidor.ok,pc.procon.ok],backgroundColor:'#166534',borderRadius:4},
-          {label:'Vencidos',data:[pc.rdr.v,pc.consumidor.v,pc.procon.v],backgroundColor:'#c0392b',borderRadius:4},
+          {label:'Registros',data:[tr,tc,tp],backgroundColor:['#1a56db','#0b7a5e','#7c3aed'],borderRadius:4},
         ]},
       options:{responsive:true,maintainAspectRatio:false,
         plugins:{legend:{display:true,position:'top',labels:{font:{size:9},boxWidth:8,padding:5}}},
