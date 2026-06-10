@@ -527,7 +527,8 @@ const H={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bear
 const sbGet=(t,p='')=>{
   const c=new AbortController();
   const tm=setTimeout(()=>c.abort(),15000);
-  return fetch(`${SB_URL}/rest/v1/${t}?${p}`,{headers:H,signal:c.signal})
+  const sep=t.includes('?')?(p?'&':''):'?';
+  return fetch(`${SB_URL}/rest/v1/${t}${sep}${p}`,{headers:H,signal:c.signal})
     .finally(()=>clearTimeout(tm))
     .then(r=>r.json())
     .catch(e=>{console.warn('sbGet erro:',t,e.message);return[];});
