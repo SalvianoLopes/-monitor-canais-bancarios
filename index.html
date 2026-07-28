@@ -211,6 +211,8 @@ tr:hover td{background:#fafaf8}
 .btn-modal-cancel{background:var(--paper);color:var(--ink2);border:1px solid var(--border2)!important}
 .btn-modal-confirm{background:var(--danger);color:#fff}
 .btn-modal-confirm:hover{background:#a93226}
+.btn-modal-confirm:disabled{opacity:.45;cursor:not-allowed}
+.modal-confirm-input{width:100%;padding:8px 10px;border:1px solid var(--border2);border-radius:7px;font-family:'DM Sans',sans-serif;font-size:12px;box-sizing:border-box;margin-bottom:16px}
 
 /* ABA VISÃO GERAL */
 .vg-btn:hover{color:var(--ink2)}
@@ -1311,20 +1313,50 @@ function executarBusca(termo) {
 
 /* ══ EXCLUIR DADOS DO CANAL ══ */
 let excluirPendente = null;
+const NOMES_CANAL = { rdr:'RDR — BACEN', consumidor:'Consumidor.gov.br', procon:'PROCON' };
 
-function pedirExclusao(canal, ds, todos=false) {
-  const nomes = { rdr:'RDR — BACEN', consumidor:'Consumidor.gov.br', procon:'PROCON' };
+async function pedirExclusao(canal, ds, todos=false) {
   const [y,m,d] = ds.split('-');
   excluirPendente = { canal, ds, todos };
+
+  // Conta quantos registros serão realmente afetados antes de mostrar o modal
+  const filtroContagem = todos
+    ? `canal=eq.${canal}&select=id`
+    : `canal=eq.${canal}&data_ref=eq.${ds}&select=id`;
+  const registros = await sbGet('canais_criticos_demandas', filtroContagem);
+  const qtd = (registros||[]).length;
+
   const titulo = todos
-    ? `🗑 Excluir TUDO — ${nomes[canal]}`
-    : `🗑 Excluir ${nomes[canal]} — ${d}/${m}/${y}`;
+    ? `🗑 Excluir TUDO — ${NOMES_CANAL[canal]}`
+    : `🗑 Excluir ${NOMES_CANAL[canal]} — ${d}/${m}/${y}`;
   const msg = todos
-    ? `Você está prestes a excluir TODOS os registros de ${nomes[canal]} (todos os dias). Esta ação não pode ser desfeita.`
-    : `Você está prestes a excluir todos os registros de ${nomes[canal]} do dia ${d}/${m}/${y}. Esta ação não pode ser desfeita.`;
+    ? `Você está prestes a excluir ${qtd} registro(s) de ${NOMES_CANAL[canal]} — TODOS os dias. Esta ação não pode ser desfeita.`
+    : `Você está prestes a excluir ${qtd} registro(s) de ${NOMES_CANAL[canal]} do dia ${d}/${m}/${y}. Esta ação não pode ser desfeita.`;
   document.getElementById('modal-title').textContent = titulo;
   document.getElementById('modal-msg').textContent = msg;
+
+  const input = document.getElementById('modal-confirm-input');
+  const btn = document.getElementById('modal-confirm-btn');
+  if (todos) {
+    // Exclusão do canal inteiro exige digitar a palavra de confirmação
+    input.style.display = 'block';
+    input.value = '';
+    input.placeholder = `Digite EXCLUIR ${canal.toUpperCase()} para confirmar`;
+    btn.disabled = true;
+  } else {
+    input.style.display = 'none';
+    btn.disabled = false;
+  }
+
   document.getElementById('modal-overlay').classList.add('show');
+}
+
+function checarConfirmacao() {
+  if (!excluirPendente || !excluirPendente.todos) return;
+  const esperado = `EXCLUIR ${excluirPendente.canal.toUpperCase()}`;
+  const input = document.getElementById('modal-confirm-input');
+  const btn = document.getElementById('modal-confirm-btn');
+  btn.disabled = input.value.trim().toUpperCase() !== esperado;
 }
 
 function fecharModal(e) {
@@ -1332,29 +1364,26 @@ function fecharModal(e) {
 }
 function fecharModalBtn() {
   document.getElementById('modal-overlay').classList.remove('show');
+  document.getElementById('modal-confirm-input').style.display = 'none';
   excluirPendente = null;
 }
 
 async function confirmarExclusao() {
   if (!excluirPendente) return;
-  const { canal } = excluirPendente;
+  const { canal, ds, todos } = excluirPendente;
   fecharModalBtn();
   toast('⏳ Excluindo…', 'info');
 
   try {
-    // Pegar todos os data_refs deste canal no banco
-    const registros = await sbGet('canais_criticos_demandas',
-      `canal=eq.${canal}&select=data_ref`);
-    const dataRefs = [...new Set((registros||[]).map(r=>r.data_ref))];
+    // Exclusão de um dia específico é SEMPRE restrita por data_ref — nunca apaga o canal inteiro sem o usuário pedir explicitamente
+    const filtroData = todos ? '' : `&data_ref=eq.${ds}`;
 
-    // Deletar demandas de todos os data_refs deste canal
-    await fetch(`${SB_URL}/rest/v1/canais_criticos_demandas?canal=eq.${canal}`,
+    await fetch(`${SB_URL}/rest/v1/canais_criticos_demandas?canal=eq.${canal}${filtroData}`,
       { method:'DELETE', headers:H });
-    // Deletar uploads correspondentes
-    await fetch(`${SB_URL}/rest/v1/canais_criticos_uploads?canal=eq.${canal}`,
+    await fetch(`${SB_URL}/rest/v1/canais_criticos_uploads?canal=eq.${canal}${filtroData}`,
       { method:'DELETE', headers:H });
 
-    toast('✅ Todos os dados de '+{rdr:'RDR',consumidor:'Consumidor',procon:'PROCON'}[canal]+' excluídos.','ok');
+    toast('✅ Registros de '+NOMES_CANAL[canal]+' excluídos.','ok');
     await carregarDados();
   } catch(e) {
     toast('❌ Erro ao excluir.','err');
@@ -1904,6 +1933,7 @@ function renderPainelGeral(){
   <div class="modal-box">
     <h3 id="modal-title">🗑 Excluir dados</h3>
     <p id="modal-msg">Tem certeza que deseja excluir esses registros? Esta ação não pode ser desfeita.</p>
+    <input type="text" id="modal-confirm-input" class="modal-confirm-input" style="display:none" oninput="checarConfirmacao()" autocomplete="off">
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="fecharModalBtn()">Cancelar</button>
       <button class="btn-modal-confirm" id="modal-confirm-btn" onclick="confirmarExclusao()">Sim, excluir</button>
