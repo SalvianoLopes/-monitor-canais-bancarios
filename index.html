@@ -370,6 +370,26 @@ tr:hover td{background:#fafaf8}
 </head>
 <body>
 
+<!-- TELA DE LOGIN — só aparece no app real, antes de autenticar -->
+<div id="login-gate" style="display:none;position:fixed;inset:0;z-index:500;background:var(--paper);align-items:center;justify-content:center;">
+  <div style="width:100%;max-width:340px;background:var(--surface);border:1px solid var(--border);border-radius:var(--rl);padding:32px 28px;box-shadow:0 8px 32px rgba(0,0,0,.08)">
+    <div style="display:flex;align-items:center;gap:9px;margin-bottom:22px">
+      <div class="hmark"><svg viewBox="0 0 16 16"><path d="M2 3h12v2H2zm0 4h8v2H2zm0 4h10v2H2z"/></svg></div>
+      <div style="font-size:14px;font-weight:600">Plataforma de Gestão de Demandas</div>
+    </div>
+    <label style="font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px">E-mail</label>
+    <input id="login-email" type="text" value="sao-atendimento@inbursa.com" readonly
+      style="width:100%;margin:5px 0 14px;padding:9px 11px;border:1px solid var(--border2);border-radius:8px;font-family:'DM Mono',monospace;font-size:12px;background:var(--paper);color:var(--ink2);box-sizing:border-box">
+    <label style="font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px">Senha</label>
+    <input id="login-senha" type="password" placeholder="Sua senha" autocomplete="current-password"
+      style="width:100%;margin:5px 0 6px;padding:9px 11px;border:1px solid var(--border2);border-radius:8px;font-size:13px;box-sizing:border-box;font-family:'DM Sans',sans-serif"
+      onkeydown="if(event.key==='Enter')fazerLogin()">
+    <div id="login-erro" style="display:none;font-size:11px;color:var(--danger);margin-bottom:10px"></div>
+    <button id="login-btn" onclick="fazerLogin()"
+      style="width:100%;margin-top:10px;padding:10px;background:var(--ink);color:#fff;border:none;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;cursor:pointer">Entrar</button>
+  </div>
+</div>
+
 <!-- BANNER MODO DEMO — só aparece fora do domínio real -->
 <div id="banner-demo" style="display:none;background:#F59E0B;color:#1C1917;text-align:center;padding:7px 16px;font-size:12px;font-weight:700;letter-spacing:0.3px;position:sticky;top:0;z-index:200;align-items:center;justify-content:center;gap:10px;">
   <span>⚠ MODO DEMO</span>
@@ -390,6 +410,10 @@ tr:hover td{background:#fafaf8}
       <span class="chip rdr" id="chip-rdr">RDR 0</span>
       <span class="chip cons" id="chip-cons">Consumidor 0</span>
       <span class="chip proc" id="chip-proc">PROCON 0</span>
+    </div>
+    <div id="user-badge" style="display:none;align-items:center;gap:8px;margin-left:8px">
+      <span style="font-size:11px;color:var(--ink2)">👤 <b id="user-nome">—</b></span>
+      <button onclick="fazerLogout()" style="font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;padding:5px 10px;background:none;border:1px solid var(--border2);border-radius:6px;cursor:pointer;color:var(--ink2)">Sair</button>
     </div>
   </div>
 </div>
@@ -526,6 +550,126 @@ const SB_URL=_REAL?'https://yaaoisqyxfqocrnlymjm.supabase.co':'';
 const SB_KEY=_REAL?'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlhYW9pc3F5eGZxb2Nybmx5bWptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA4NjkxNjYsImV4cCI6MjA4NjQ0NTE2Nn0.GffNyO_nYJZKkACJsaX2AuHOkh0kOa58-b3fnMgaixg':'';
 if(!_REAL){const b=document.getElementById('banner-demo');if(b){b.style.display='flex';}}
 const H={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`};
+
+/* ══ LOGIN / SESSÃO ══
+   Um único e-mail de acesso (sao-atendimento@inbursa.com) — a SENHA identifica quem é
+   (Oliveira ou Zoghaib). Por baixo, cada um é uma conta real do Supabase Auth (e-mail com
+   alias +oliveira/+zoghaib), pra manter login de verdade sem expor senha no código-fonte. */
+const CONTAS_LOGIN=[
+  {email:'sao-atendimento+oliveira@inbursa.com', nome:'Oliveira'},
+  {email:'sao-atendimento+zoghaib@inbursa.com', nome:'Zoghaib'},
+];
+const SESSION_KEY='cc_session';
+
+function getSessao(){
+  try{ return JSON.parse(localStorage.getItem(SESSION_KEY)||'null'); }catch(e){ return null; }
+}
+function salvarSessao(s){ localStorage.setItem(SESSION_KEY, JSON.stringify(s)); }
+function limparSessao(){ localStorage.removeItem(SESSION_KEY); }
+
+function aplicarSessao(s){
+  H.Authorization = `Bearer ${s.access_token}`;
+  const badge=document.getElementById('user-badge');
+  const nomeEl=document.getElementById('user-nome');
+  if(badge) badge.style.display='flex';
+  if(nomeEl) nomeEl.textContent=s.nome;
+}
+
+function mostrarLoginGate(mostrar){
+  const g=document.getElementById('login-gate');
+  if(g) g.style.display = mostrar ? 'flex' : 'none';
+}
+
+async function tentarLoginConta(email, senha){
+  try{
+    const resp = await fetch(`${SB_URL}/auth/v1/token?grant_type=password`,{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+      body: JSON.stringify({email, password: senha})
+    });
+    if(!resp.ok) return null;
+    return resp.json();
+  }catch(e){ return null; }
+}
+
+async function fazerLogin(){
+  const senha = document.getElementById('login-senha').value;
+  const erroEl = document.getElementById('login-erro');
+  const btn = document.getElementById('login-btn');
+  erroEl.style.display='none';
+  if(!senha){ erroEl.textContent='Digite a senha.'; erroEl.style.display='block'; return; }
+  btn.disabled=true; btn.textContent='Entrando…';
+  try{
+    for(const conta of CONTAS_LOGIN){
+      const dados = await tentarLoginConta(conta.email, senha);
+      if(dados && dados.access_token){
+        const sessao = {
+          access_token: dados.access_token,
+          refresh_token: dados.refresh_token,
+          expires_at: Date.now() + (dados.expires_in||3600)*1000,
+          nome: conta.nome,
+        };
+        salvarSessao(sessao);
+        aplicarSessao(sessao);
+        mostrarLoginGate(false);
+        document.getElementById('login-senha').value='';
+        renderCal();
+        await carregarDados();
+        return;
+      }
+    }
+    erroEl.textContent='Senha incorreta.';
+    erroEl.style.display='block';
+  }catch(e){
+    erroEl.textContent='Erro de conexão. Tente novamente.';
+    erroEl.style.display='block';
+  }finally{
+    btn.disabled=false; btn.textContent='Entrar';
+  }
+}
+
+function fazerLogout(){
+  limparSessao();
+  window.location.reload();
+}
+
+async function renovarSessao(s){
+  try{
+    const resp = await fetch(`${SB_URL}/auth/v1/token?grant_type=refresh_token`,{
+      method:'POST',
+      headers:{'apikey':SB_KEY,'Content-Type':'application/json'},
+      body: JSON.stringify({refresh_token: s.refresh_token})
+    });
+    if(!resp.ok) return null;
+    const dados = await resp.json();
+    return {
+      access_token: dados.access_token,
+      refresh_token: dados.refresh_token,
+      expires_at: Date.now() + (dados.expires_in||3600)*1000,
+      nome: s.nome,
+    };
+  }catch(e){ return null; }
+}
+
+/* Garante sessão válida antes de mexer no banco real. Renova silenciosamente perto de expirar;
+   se não conseguir, mostra a tela de login de novo. Demo (_REAL=false) nunca precisa disso. */
+async function garantirSessao(){
+  if(!_REAL) return true;
+  let s = getSessao();
+  if(!s){ mostrarLoginGate(true); return false; }
+  if(Date.now() > s.expires_at - 5*60*1000){
+    const nova = await renovarSessao(s);
+    if(!nova){ limparSessao(); mostrarLoginGate(true); return false; }
+    s = nova;
+    salvarSessao(s);
+  }
+  aplicarSessao(s);
+  mostrarLoginGate(false);
+  return true;
+}
+
+setInterval(()=>{ if(_REAL) garantirSessao(); }, 5*60*1000);
+
 const sbGet=(t,p='')=>{
   const c=new AbortController();
   const tm=setTimeout(()=>c.abort(),15000);
@@ -588,6 +732,10 @@ function isEncerrado(r){
 
 /* ══ INIT ══ */
 window.addEventListener('DOMContentLoaded',async()=>{
+  if(_REAL){
+    const logado = await garantirSessao();
+    if(!logado) return; // fica na tela de login; fazerLogin() continua o carregamento
+  }
   renderCal();
   await carregarDados();
 });
