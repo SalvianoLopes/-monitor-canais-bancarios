@@ -540,6 +540,19 @@ const sbPost=(t,b)=>fetch(`${SB_URL}/rest/v1/${t}`,{method:'POST',headers:{...H,
 /* ══ FERIADOS NACIONAIS 2026 ══ */
 const FERIADOS=new Set(['2026-04-03','2026-04-21','2026-05-01','2026-06-04','2026-09-07','2026-10-12','2026-11-02','2026-11-15','2026-12-25']);
 
+/* Números oficiais do painel Consumidor.gov.br — atualizados manualmente (não calculados pelo app,
+   fonte: painel oficial do Consumidor.gov, tela "Indicadores oficiais"). Atualizar quando o Salviano
+   trouxer números mais recentes. */
+const OFICIAL_CONSUMIDOR={
+  atualizadoEm:'28/07/2026',
+  periodo:'6 meses',
+  nota:2.6,
+  finalizadas:956,
+  indiceSolucao:85.1,
+  respondidas:97.5,
+  tempoResposta:'5,8 dias',
+};
+
 /* ══ ESTADO ══ */
 let calAno=2026,calMes=3;
 let diaSel=null;
@@ -905,6 +918,32 @@ function buildScoreConsumidor(){
         <div style="font-size:24px;font-weight:700;color:var(--ink);line-height:1">${total}</div>
         <div style="font-size:9px;color:var(--ink3);margin-top:3px">registros consumidor</div>
       </div>
+    </div>
+    <div style="margin-top:12px;padding-top:12px;border-top:1px dashed rgba(11,122,94,.25)">
+      <div style="font-size:9px;font-weight:700;color:var(--cons);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">🏛️ Painel oficial Consumidor.gov.br — últimos ${OFICIAL_CONSUMIDOR.periodo} (informado manualmente em ${OFICIAL_CONSUMIDOR.atualizadoEm})</div>
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;align-items:end">
+        <div>
+          <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Nota oficial</div>
+          <div style="font-size:20px;font-weight:700;color:var(--cons);line-height:1">${OFICIAL_CONSUMIDOR.nota}<span style="font-size:11px;color:var(--ink3);font-weight:400">/5</span></div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Finalizadas</div>
+          <div style="font-size:20px;font-weight:700;color:var(--ink);line-height:1">${OFICIAL_CONSUMIDOR.finalizadas}</div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Índice de solução</div>
+          <div style="font-size:20px;font-weight:700;color:var(--ink);line-height:1">${OFICIAL_CONSUMIDOR.indiceSolucao}<span style="font-size:11px;font-weight:400">%</span></div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Respondidas</div>
+          <div style="font-size:20px;font-weight:700;color:var(--ink);line-height:1">${OFICIAL_CONSUMIDOR.respondidas}<span style="font-size:11px;font-weight:400">%</span></div>
+        </div>
+        <div>
+          <div style="font-size:9px;color:var(--ink3);font-weight:600;text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px">Tempo resposta</div>
+          <div style="font-size:16px;font-weight:700;color:var(--ink);line-height:1">${OFICIAL_CONSUMIDOR.tempoResposta}</div>
+        </div>
+      </div>
+      <div style="font-size:9px;color:var(--ink3);margin-top:8px">Fonte: painel oficial Consumidor.gov (não calculado pelo app — atualizar manualmente quando houver número mais recente)</div>
     </div>
   </div>`;
 }
