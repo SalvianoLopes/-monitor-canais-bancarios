@@ -118,7 +118,29 @@ Nenhum desses tem coluna de nota (1-5) — só Situação. RDR não tem coluna T
 - Último backup manual antes da automação: `BACKUP_2026-05-06_20-22.xlsx`
 - Backup pós-limpeza final: `BACKUP_2026-05-26_20-01.xlsx` (547 KB — 4.223 demandas, estado limpo)
 
-## Histórico de sessões
+## Login (adicionado 29/07/2026)
+App real agora exige login via **Supabase Auth** — sem login, `garantirSessao()` mostra a tela `#login-gate` e bloqueia `carregarDados()`. Demo (`_REAL=false`) não usa login (segue liberado, dado fictício).
+
+- **UX:** um único e-mail fixo exibido na tela (`sao-atendimento@inbursa.com`), a **senha** é quem identifica o usuário.
+- **Por baixo:** 2 contas reais no Supabase Auth (aliases `+oliveira`/`+zoghaib`, GoTrue trata como e-mails distintos — não precisam existir de verdade, criadas já confirmadas via SQL direto em `auth.users`/`auth.identities`):
+  | Usuário | E-mail da conta | Senha |
+  |---|---|---|
+  | Oliveira | `sao-atendimento+oliveira@inbursa.com` | `Oliveira` |
+  | Zoghaib | `sao-atendimento+zoghaib@inbursa.com` | `Zoghaib` |
+- **Fluxo de login (`fazerLogin()`):** tenta a senha digitada contra as 2 contas em sequência (`POST /auth/v1/token?grant_type=password`); a que aceitar identifica o usuário. Sessão (`access_token`, `refresh_token`, `expires_at`, `nome`) salva em `localStorage['cc_session']`.
+- **Sessão:** `H.Authorization` passa a usar o `access_token` do usuário (não mais a anon key fixa) — todos os `fetch()` do app já usam o objeto `H` por referência, então a troca é automática em todo o app.
+- **Renovação:** `garantirSessao()` roda no load e a cada 5 min; renova via `grant_type=refresh_token` quando faltam <5 min pra expirar; se falhar, mostra login de novo.
+- **Header:** badge "👤 Nome" + botão "Sair" (`fazerLogout()` limpa a sessão e recarrega a página).
+- **Motivo de ter feito assim:** pedido do Salviano — login único (mesmo e-mail) mas cada senha identifica a pessoa, pra depois medir SLA por usuário. Usar contas reais do Supabase Auth (em vez de senha hardcoded no JS) evita expor as senhas no código-fonte da página.
+- **Pendência (combinado 29/07/2026):** hoje só 2 contas de teste (Oliveira/Zoghaib). Plano: testar no dia 30/07/2026 e, validado, abrir mais usuários/senhas (aumentar os acessos). Pra cada novo usuário: criar conta real no Supabase Auth (mesmo padrão `sao-atendimento+<nome>@inbursa.com` / senha = sobrenome, via SQL direto em `auth.users`+`auth.identities` — ver bloco usado em 29/07) e adicionar em `CONTAS_LOGIN` no `index.html`.
+
+### RLS travado (29/07/2026) — fechando brecha de segurança
+Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `anon_full_access` (FOR ALL TO anon) — **qualquer pessoa com a anon key (visível dando "Ver código-fonte" na página) tinha leitura E escrita completa, incluindo CPF real de clientes**, sem precisar nem abrir o app.
+- Todas as policies antigas (anon_full_access + várias policies soltas duplicadas em `public`) foram **removidas**.
+- Cada tabela agora tem **uma única policy**: `authenticated_full_access` — `FOR ALL TO authenticated USING (true) WITH CHECK (true)`.
+- Confirmado por teste: GET com só a anon key agora retorna `200 []` (RLS filtra tudo, não dá erro — é assim que Postgres RLS se comporta via PostgREST).
+- **`backup-canais-criticos\backup.py` foi atualizado** — antes usava só a anon key; agora faz login (`grant_type=password`, conta Oliveira) antes de puxar os dados, senão o backup automático (Task Scheduler, sem interação) pararia de funcionar. Testado manualmente após a mudança: 6.739 registros, ok.
+
 ### 2026-07-28
 **Incidente + restauração Consumidor:** 2.205 registros de `consumidor` foram apagados entre 27/07 09:09 e 19:58 (causa raiz achada nesta mesma sessão — ver abaixo). Restaurado via `restaurar_consumidor.py` a partir do backup `BACKUP_2026-07-27_09-09.xlsx` (2.205 registros, zero erro).
 
