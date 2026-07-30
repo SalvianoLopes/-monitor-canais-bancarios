@@ -92,6 +92,17 @@ Para inserir no banco sem duplicatas:
 **Tag PROCON:** extrair linha do "Banco Inbursa" da Situação, remover prefixo "Banco Inbursa - ".  
 **Sem situação:** usar "Aguardando Resposta" como padrão.
 
+## Tags de assunto do RDR/BACEN em `extra1` (30/07/2026)
+O formato usado pro RDR (ver "Formato Respondida/Não Respondida" abaixo) nunca trouxe uma coluna de assunto/categoria — só Situação (status). O usuário tinha uma planilha separada (`Consolidado Geral.xlsx`, aba `Consolidado`) com o export tradicional do MOL, que tem coluna `Demanda` = a tag de assunto de verdade (ex: "Cópia do contrato", "Desconhece refinanciamento - BP", "Extrato/DED").
+
+- **Campo usado:** `extra1` — estava livre pro canal RDR (só usado por Consumidor/PROCON pra outra coisa), então não precisou de coluna nova nem migração de schema.
+- **Chave de cruzamento:** `numero` (protocolo) — confirmado que é o mesmo protocolo/CPF/nome batendo entre planilha e banco antes de gravar qualquer coisa.
+- **Origem da planilha:** aba "Consolidado" tinha 1.354 linhas brutas, mas 83 eram sobra vazia do range do Excel → 1.271 registros reais. 6 protocolos apareciam duplicados dentro da própria planilha (2 com tags conflitantes entre si) — regra usada: manter a primeira ocorrência com tag preenchida.
+- **Resultado do cruzamento (30/07/2026):** 1.265 protocolos únicos na planilha → **1.262 batendo no banco, gravados em `extra1` sem sobrescrever nada** (campo estava 100% vazio antes) → 3 da planilha sem match no app (fora do período) → **46 registros do app ficaram sem tag** (fora do período coberto por essa planilha específica), exportados pro usuário em `Downloads\RDR_sem_tag.xlsx` (protocolo + nome) pra ele puxar a tag certa direto no MOL depois.
+- Scripts do processo (dry-run + write) ficaram em `AppData\Local\Temp\claude\...\scratchpad\` (não versionados).
+
+**How to apply:** Se aparecer nova planilha de tags do RDR no formato tradicional do MOL (colunas Número/Nome/CPF/CNPJ/Demanda/Status/...), repetir o mesmo fluxo: ler com `dtype=str` (evita virar float o protocolo), filtrar linhas com `Número` vazio, dedupe por protocolo mantendo a primeira ocorrência com `Demanda` preenchida, cruzar contra `canais_criticos_demandas` por `numero`, fazer dry-run antes de gravar, PATCH só em `extra1`.
+
 ## Regra de prazo (atualizado 01/06/2026)
 - **Regra de vencido REMOVIDA** — `prazoEfetivo(r)` retorna `null` para todos os registros
 - App usado apenas para **registro de entradas**; respostas são feitas no MOL
