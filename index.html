@@ -1532,6 +1532,17 @@ function fecharModalBtn() {
   excluirPendente = null;
 }
 
+function mostrarDuplicatas(lista){
+  const el = document.getElementById('modal-dup-lista');
+  el.innerHTML = lista.map(x=>`<div>${NOMES_CANAL[x.canal]||x.canal.toUpperCase()} — ${x.numero}</div>`).join('');
+  document.getElementById('modal-dup-overlay').classList.add('show');
+}
+function fecharModalDup(e) {
+  if (!e || e.target === document.getElementById('modal-dup-overlay')) {
+    document.getElementById('modal-dup-overlay').classList.remove('show');
+  }
+}
+
 async function confirmarExclusao() {
   if (!excluirPendente) return;
   const { canal, ds, todos } = excluirPendente;
@@ -1822,6 +1833,7 @@ async function salvarDia(){
     }
 
     let totalNovos=0, totalAtualizados=0;
+    const duplicatasArquivo=[];
     for(const canal of['rdr','consumidor','procon']){
       if(!stLocal[canal])continue;
       const rows=stLocal[canal].rows;
@@ -1851,6 +1863,15 @@ async function salvarDia(){
         }
       });
 
+      // ── Barrar duplicatas dentro do próprio arquivo (mesmo protocolo repetido na planilha) ──
+      const numerosVistos=new Set();
+      const novosFiltrados=novos.filter(r=>{
+        const num=String(r.numero||'').trim();
+        if(numerosVistos.has(num)){duplicatasArquivo.push({canal,numero:num});return false;}
+        numerosVistos.add(num);
+        return true;
+      });
+
       // ── PATCH: atualizar status dos já existentes (respondidos/finalizados) ──
       for(const upd of aAtualizar){
         await fetch(`${SB_URL}/rest/v1/canais_criticos_demandas?canal=eq.${canal}&numero=eq.${encodeURIComponent(upd.numero)}`,{
@@ -1861,8 +1882,8 @@ async function salvarDia(){
       }
       totalAtualizados+=aAtualizar.length;
 
-      if(!novos.length)continue;
-      totalNovos+=novos.length;
+      if(!novosFiltrados.length)continue;
+      totalNovos+=novosFiltrados.length;
 
       // ── Agrupa NOVOS pela data de captura de cada um ──
       const extrairDataRef=(abertura)=>{
@@ -1876,7 +1897,7 @@ async function salvarDia(){
       };
 
       const porData={};
-      novos.forEach(r=>{
+      novosFiltrados.forEach(r=>{
         const dr=extrairDataRef(r.abertura);
         if(!porData[dr])porData[dr]=[];
         porData[dr].push(r);
@@ -1942,7 +1963,9 @@ async function salvarDia(){
     const partes=[];
     if(totalNovos)partes.push(`${totalNovos} inseridos`);
     if(totalAtualizados)partes.push(`${totalAtualizados} status atualizados`);
+    if(duplicatasArquivo.length)partes.push(`${duplicatasArquivo.length} duplicados no arquivo (ignorados)`);
     toast('✅ '+(partes.length?partes.join(', '):'Nenhuma alteração')+'!','ok');
+    if(duplicatasArquivo.length) mostrarDuplicatas(duplicatasArquivo);
     stLocal={rdr:null,consumidor:null,procon:null,rdr_det:null,cons_det:null};
     resetSlots();
     await carregarDados();
@@ -2101,6 +2124,18 @@ function renderPainelGeral(){
     <div class="modal-actions">
       <button class="btn-modal-cancel" onclick="fecharModalBtn()">Cancelar</button>
       <button class="btn-modal-confirm" id="modal-confirm-btn" onclick="confirmarExclusao()">Sim, excluir</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL PROTOCOLOS DUPLICADOS NO ARQUIVO -->
+<div class="modal-overlay" id="modal-dup-overlay" onclick="fecharModalDup(event)">
+  <div class="modal-box" style="width:420px;max-height:70vh;display:flex;flex-direction:column">
+    <h3>⚠ Protocolos duplicados no arquivo</h3>
+    <p>Estes protocolos apareceram repetidos dentro da própria planilha enviada — apenas a primeira ocorrência de cada um foi considerada, as demais foram ignoradas (não inseridas):</p>
+    <div id="modal-dup-lista" style="overflow-y:auto;flex:1;font-family:'DM Mono',monospace;font-size:11px;background:var(--paper);border-radius:8px;padding:10px 12px;margin-bottom:14px"></div>
+    <div class="modal-actions">
+      <button class="btn-modal-confirm" onclick="fecharModalDup()">Entendi</button>
     </div>
   </div>
 </div>
