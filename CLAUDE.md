@@ -122,17 +122,22 @@ Nenhum desses tem coluna de nota (1-5) — só Situação. RDR não tem coluna T
 App real agora exige login via **Supabase Auth** — sem login, `garantirSessao()` mostra a tela `#login-gate` e bloqueia `carregarDados()`. Demo (`_REAL=false`) não usa login (segue liberado, dado fictício).
 
 - **UX:** um único e-mail fixo exibido na tela (`sao-atendimento@inbursa.com`), a **senha** é quem identifica o usuário.
-- **Por baixo:** 2 contas reais no Supabase Auth (aliases `+oliveira`/`+zoghaib`, GoTrue trata como e-mails distintos — não precisam existir de verdade, criadas já confirmadas via SQL direto em `auth.users`/`auth.identities`):
+- **Por baixo:** contas reais no Supabase Auth (aliases `+nome`, GoTrue trata como e-mails distintos — não precisam existir de verdade, criadas já confirmadas via SQL direto em `auth.users`/`auth.identities`):
   | Usuário | E-mail da conta | Senha |
   |---|---|---|
   | Oliveira | `sao-atendimento+oliveira@inbursa.com` | `Oliveira` |
   | Zoghaib | `sao-atendimento+zoghaib@inbursa.com` | `Zoghaib` |
+  | Bovi | `sao-atendimento+bovi@inbursa.com` | `Bovi` |
+  | Aguilera | `sao-atendimento+aguilera@inbursa.com` | `Aguilera` |
+  | Castagni | `sao-atendimento+castagni@inbursa.com` | `Castagni` |
+  | Mellugo | `sao-atendimento+mellugo@inbursa.com` | `Mellugo` |
+  (Bovi/Aguilera/Castagni/Mellugo adicionados em 30/07/2026, mesmo padrão dos 2 primeiros — `fazerLogin()` tenta a senha digitada contra todas em sequência até achar a conta certa.)
 - **Fluxo de login (`fazerLogin()`):** tenta a senha digitada contra as 2 contas em sequência (`POST /auth/v1/token?grant_type=password`); a que aceitar identifica o usuário. Sessão (`access_token`, `refresh_token`, `expires_at`, `nome`) salva em `localStorage['cc_session']`.
 - **Sessão:** `H.Authorization` passa a usar o `access_token` do usuário (não mais a anon key fixa) — todos os `fetch()` do app já usam o objeto `H` por referência, então a troca é automática em todo o app.
 - **Renovação:** `garantirSessao()` roda no load e a cada 5 min; renova via `grant_type=refresh_token` quando faltam <5 min pra expirar; se falhar, mostra login de novo.
 - **Header:** badge "👤 Nome" + botão "Sair" (`fazerLogout()` limpa a sessão e recarrega a página).
 - **Motivo de ter feito assim:** pedido do Salviano — login único (mesmo e-mail) mas cada senha identifica a pessoa, pra depois medir SLA por usuário. Usar contas reais do Supabase Auth (em vez de senha hardcoded no JS) evita expor as senhas no código-fonte da página.
-- **Pendência (combinado 29/07/2026):** hoje só 2 contas de teste (Oliveira/Zoghaib). Plano: testar no dia 30/07/2026 e, validado, abrir mais usuários/senhas (aumentar os acessos). Pra cada novo usuário: criar conta real no Supabase Auth (mesmo padrão `sao-atendimento+<nome>@inbursa.com` / senha = sobrenome, via SQL direto em `auth.users`+`auth.identities` — ver bloco usado em 29/07) e adicionar em `CONTAS_LOGIN` no `index.html`.
+- **Expansão de acessos (30/07/2026):** validado o teste inicial com Oliveira/Zoghaib, adicionados mais 4 usuários (Bovi, Aguilera, Castagni, Mellugo) — total 6 contas ativas. Pra abrir mais no futuro: criar conta real no Supabase Auth (mesmo padrão `sao-atendimento+<nome>@inbursa.com` / senha = sobrenome, via SQL direto em `auth.users`+`auth.identities`) e adicionar em `CONTAS_LOGIN` no `index.html`.
 
 ### RLS travado (29/07/2026) — fechando brecha de segurança
 Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `anon_full_access` (FOR ALL TO anon) — **qualquer pessoa com a anon key (visível dando "Ver código-fonte" na página) tinha leitura E escrita completa, incluindo CPF real de clientes**, sem precisar nem abrir o app.
