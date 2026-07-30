@@ -378,7 +378,7 @@ tr:hover td{background:#fafaf8}
       <div style="font-size:14px;font-weight:600">Plataforma de Gestão de Demandas</div>
     </div>
     <label style="font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px">E-mail</label>
-    <input id="login-email" type="text" value="sao-atendimento@inbursa.com" readonly
+    <input id="login-email" type="text" value="canais.criticos@inbursa.com" readonly
       style="width:100%;margin:5px 0 14px;padding:9px 11px;border:1px solid var(--border2);border-radius:8px;font-family:'DM Mono',monospace;font-size:12px;background:var(--paper);color:var(--ink2);box-sizing:border-box">
     <label style="font-size:10px;font-weight:600;color:var(--ink3);text-transform:uppercase;letter-spacing:.4px">Senha</label>
     <input id="login-senha" type="password" placeholder="Sua senha" autocomplete="current-password"
@@ -552,16 +552,17 @@ if(!_REAL){const b=document.getElementById('banner-demo');if(b){b.style.display=
 const H={'Content-Type':'application/json','apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`};
 
 /* ══ LOGIN / SESSÃO ══
-   Um único e-mail de acesso (sao-atendimento@inbursa.com) — a SENHA identifica quem é
-   (Oliveira ou Zoghaib). Por baixo, cada um é uma conta real do Supabase Auth (e-mail com
-   alias +oliveira/+zoghaib), pra manter login de verdade sem expor senha no código-fonte. */
+   Um único e-mail de acesso (canais.criticos@inbursa.com) — a SENHA identifica quem é.
+   Por baixo, cada um é uma conta real do Supabase Auth (e-mail com alias +nome), pra manter
+   login de verdade sem expor senha no código-fonte. */
 const CONTAS_LOGIN=[
-  {email:'sao-atendimento+oliveira@inbursa.com', nome:'Oliveira'},
-  {email:'sao-atendimento+zoghaib@inbursa.com', nome:'Zoghaib'},
-  {email:'sao-atendimento+bovi@inbursa.com', nome:'Bovi'},
-  {email:'sao-atendimento+aguilera@inbursa.com', nome:'Aguilera'},
-  {email:'sao-atendimento+castagni@inbursa.com', nome:'Castagni'},
-  {email:'sao-atendimento+mellugo@inbursa.com', nome:'Mellugo'},
+  {email:'canais.criticos+oliveira@inbursa.com', nome:'Oliveira'},
+  {email:'canais.criticos+zoghaib@inbursa.com', nome:'Zoghaib'},
+  {email:'canais.criticos+bovi@inbursa.com', nome:'Bovi'},
+  {email:'canais.criticos+aguilera@inbursa.com', nome:'Aguilera'},
+  {email:'canais.criticos+castagni@inbursa.com', nome:'Castagni'},
+  {email:'canais.criticos+mellugo@inbursa.com', nome:'Mellugo'},
+  {email:'canais.criticos+auditoria@inbursa.com', nome:'Auditoria'},
 ];
 const SESSION_KEY='cc_session';
 

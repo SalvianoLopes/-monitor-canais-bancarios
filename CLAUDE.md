@@ -121,17 +121,18 @@ Nenhum desses tem coluna de nota (1-5) — só Situação. RDR não tem coluna T
 ## Login (adicionado 29/07/2026)
 App real agora exige login via **Supabase Auth** — sem login, `garantirSessao()` mostra a tela `#login-gate` e bloqueia `carregarDados()`. Demo (`_REAL=false`) não usa login (segue liberado, dado fictício).
 
-- **UX:** um único e-mail fixo exibido na tela (`sao-atendimento@inbursa.com`), a **senha** é quem identifica o usuário.
+- **UX:** um único e-mail fixo exibido na tela (`canais.criticos@inbursa.com` — trocado de `sao-atendimento@inbursa.com` em 30/07/2026), a **senha** é quem identifica o usuário.
 - **Por baixo:** contas reais no Supabase Auth (aliases `+nome`, GoTrue trata como e-mails distintos — não precisam existir de verdade, criadas já confirmadas via SQL direto em `auth.users`/`auth.identities`):
   | Usuário | E-mail da conta | Senha |
   |---|---|---|
-  | Oliveira | `sao-atendimento+oliveira@inbursa.com` | `Oliveira` |
-  | Zoghaib | `sao-atendimento+zoghaib@inbursa.com` | `Zoghaib` |
-  | Bovi | `sao-atendimento+bovi@inbursa.com` | `Bovi` |
-  | Aguilera | `sao-atendimento+aguilera@inbursa.com` | `Aguilera` |
-  | Castagni | `sao-atendimento+castagni@inbursa.com` | `Castagni` |
-  | Mellugo | `sao-atendimento+mellugo@inbursa.com` | `Mellugo` |
-  (Bovi/Aguilera/Castagni/Mellugo adicionados em 30/07/2026, mesmo padrão dos 2 primeiros — `fazerLogin()` tenta a senha digitada contra todas em sequência até achar a conta certa.)
+  | Oliveira | `canais.criticos+oliveira@inbursa.com` | `Oliveira` |
+  | Zoghaib | `canais.criticos+zoghaib@inbursa.com` | `Zoghaib` |
+  | Bovi | `canais.criticos+bovi@inbursa.com` | `Bovi` |
+  | Aguilera | `canais.criticos+aguilera@inbursa.com` | `Aguilera` |
+  | Castagni | `canais.criticos+castagni@inbursa.com` | `Castagni` |
+  | Mellugo | `canais.criticos+mellugo@inbursa.com` | `Mellugo` |
+  | Auditoria | `canais.criticos+auditoria@inbursa.com` | `Auditoria` |
+  (Bovi/Aguilera/Castagni/Mellugo adicionados em 30/07/2026, mesmo padrão dos 2 primeiros. Auditoria adicionada em 30/07/2026 no mesmo lote em que o domínio do e-mail mudou de `sao-atendimento` para `canais.criticos` — as 6 contas antigas foram migradas para o novo domínio, mesmas senhas. `fazerLogin()` tenta a senha digitada contra todas em sequência até achar a conta certa.)
 - **Fluxo de login (`fazerLogin()`):** tenta a senha digitada contra as 2 contas em sequência (`POST /auth/v1/token?grant_type=password`); a que aceitar identifica o usuário. Sessão (`access_token`, `refresh_token`, `expires_at`, `nome`) salva em `localStorage['cc_session']`.
 - **Sessão:** `H.Authorization` passa a usar o `access_token` do usuário (não mais a anon key fixa) — todos os `fetch()` do app já usam o objeto `H` por referência, então a troca é automática em todo o app.
 - **Renovação:** `garantirSessao()` roda no load e a cada 5 min; renova via `grant_type=refresh_token` quando faltam <5 min pra expirar; se falhar, mostra login de novo.
@@ -145,6 +146,14 @@ Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `ano
 - Cada tabela agora tem **uma única policy**: `authenticated_full_access` — `FOR ALL TO authenticated USING (true) WITH CHECK (true)`.
 - Confirmado por teste: GET com só a anon key agora retorna `200 []` (RLS filtra tudo, não dá erro — é assim que Postgres RLS se comporta via PostgREST).
 - **`backup-canais-criticos\backup.py` foi atualizado** — antes usava só a anon key; agora faz login (`grant_type=password`, conta Oliveira) antes de puxar os dados, senão o backup automático (Task Scheduler, sem interação) pararia de funcionar. Testado manualmente após a mudança: 6.739 registros, ok.
+
+### 2026-07-30
+**Acesso configurado numa segunda máquina (notebook Q7info):**
+- Repo clonado via SSH em `C:\Users\Q7info\dev\monitor-canais-bancarios`
+- Vercel CLI autenticada nessa máquina (conta `salvianolopes`, via `npx vercel login`)
+- `.env.local` local (gitignorado) com `SUPABASE_URL` + `SUPABASE_ANON_KEY` — só serve pra leitura pública; com RLS `authenticated_full_access` (ver 29/07 abaixo), qualquer leitura/escrita real exige logar como um dos usuários reais listados na seção "Login" e usar o `access_token` da sessão, não a anon key sozinha
+- Confirmado por teste (`curl` com só anon key): banco responde `200 []` — RLS bloqueando como esperado
+- **Pendência de segurança identificada, ainda não decidida:** as senhas dos 6 usuários (seção "Login" acima) ficam em texto puro neste CLAUDE.md, que é versionado no Git — mesmo o repo sendo privado, fica no histórico permanentemente. Avaliar mover pra fora do arquivo versionado se for incomodar.
 
 ### 2026-07-28
 **Incidente + restauração Consumidor:** 2.205 registros de `consumidor` foram apagados entre 27/07 09:09 e 19:58 (causa raiz achada nesta mesma sessão — ver abaixo). Restaurado via `restaurar_consumidor.py` a partir do backup `BACKUP_2026-07-27_09-09.xlsx` (2.205 registros, zero erro).
