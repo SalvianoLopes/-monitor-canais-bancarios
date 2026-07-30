@@ -107,6 +107,13 @@ Formato diferente do `MOLReport` tradicional — exportado por canal, sempre em 
 
 Nenhum desses tem coluna de nota (1-5) — só Situação. RDR não tem coluna Tags (usa Situação como "demanda"). Fluxo de upload usado: ler os dois arquivos do par, merge por chave (Número/Protocolo), buscar protocolos já existentes no banco, **INSERT** os novos (com `data_ref` derivado da data do registro, formato ISO) e **PATCH** (só `status`+`demanda`, nunca `extra1`) nos existentes com Situação preenchida. Scripts ficam em `AppData\Local\Temp\claude\...\scratchpad\upload_<canal>.py` por sessão (não versionados no repo).
 
+## Rejeição de duplicatas dentro do próprio arquivo (30/07/2026)
+`salvarDia()` já evitava duplicar protocolo que já estava no banco (PATCH se veio com Situação nova, ignora se não veio) — mas só checava contra o snapshot do banco tirado antes do loop. Se a **própria planilha enviada** tivesse o mesmo protocolo duas vezes (acontece em exports do MOL), as duas linhas passavam nessa checagem e as duas eram inseridas, gerando duplicata real que precisava de limpeza manual depois (ver auditorias de 29/07 acima).
+
+- Correção: depois de separar `novos` (protocolos que não existem no banco), um segundo filtro (`novosFiltrados`) dedupe por `numero` dentro do próprio array — mantém a primeira ocorrência, rejeita as repetidas.
+- Protocolos rejeitados por esse filtro entram em `duplicatasArquivo` e aparecem num modal novo (`#modal-dup-overlay` / `mostrarDuplicatas()`) logo após salvar, além de contarem no toast final ("N duplicados no arquivo (ignorados)").
+- **Decisão consciente:** não foi adicionada trava a nível de banco (constraint UNIQUE em `canal,numero`) — avaliado e descartado por enquanto (confirmado zero duplicata nos 6.739 registros em 30/07, então seria seguro aplicar, mas o usuário preferiu resolver só no código por ora). Se o problema voltar a aparecer (ex.: duas pessoas salvando o mesmo dia ao mesmo tempo), considerar revisitar essa trava — não é algo que a checagem em memória do app cobre (só cobre duplicata dentro do mesmo upload, não concorrência entre uploads simultâneos).
+
 ## Backup automático
 - **Script:** `C:\Users\Desktop\backup-canais-criticos\backup.py`
 - **Pasta:** `C:\Users\Desktop\backup-canais-criticos\`
