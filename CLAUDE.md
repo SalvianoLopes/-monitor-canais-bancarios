@@ -92,6 +92,15 @@ Para inserir no banco sem duplicatas:
 **Tag PROCON:** extrair linha do "Banco Inbursa" da Situação, remover prefixo "Banco Inbursa - ".  
 **Sem situação:** usar "Aguardando Resposta" como padrão.
 
+### PROCON Uberlândia — 4º formato, protocolo próprio (achado 03/08/2026)
+Fonte MOL separada dos 3 formatos acima — não aparece nos exports `MOLReport` tradicionais (por isso planilhas desse tipo, ex. export de 01/01 a 30/06/2026, não trazem esses registros e uma comparação direta de contagem vai "sobrar" no banco sem ser duplicata/erro).
+
+- **Protocolo na origem:** número puro, sem máscara (ex. `51789`) — diferente do formato `NN.NNNN.NNN.NNNNN-N` dos demais PROCONs.
+- **`numero` gravado no banco:** composto `AAAA.MM.0399.NNN.NNNNN` (ano/mês do upload + código fixo `0399` + o número puro do protocolo de origem).
+- **Sempre gravado com:** `extra1 = 'Procon Uberlândia'`, `extra2` = município.
+- **Como identificar um registro desse tipo:** `extra1 = 'Procon Uberlândia'` — não depender do formato do `numero` sozinho pra reconhecer.
+- **How to apply:** ao cruzar planilha MOL × banco por protocolo (auditoria de duplicata, conferência de totais etc.), sempre excluir/tratar à parte os registros com `extra1='Procon Uberlândia'` se a planilha de referência for um export `MOLReport` padrão — eles não vão bater porque vêm de outra fonte, não porque estão errados. Confirmado em auditoria de 03/08/2026 (ver abaixo).
+
 ## Tags de assunto do RDR/BACEN em `extra1` (30/07/2026)
 O formato usado pro RDR (ver "Formato Respondida/Não Respondida" abaixo) nunca trouxe uma coluna de assunto/categoria — só Situação (status). O usuário tinha uma planilha separada (`Consolidado Geral.xlsx`, aba `Consolidado`) com o export tradicional do MOL, que tem coluna `Demanda` = a tag de assunto de verdade (ex: "Cópia do contrato", "Desconhece refinanciamento - BP", "Extrato/DED").
 
@@ -196,6 +205,12 @@ RDR estava quase vazio desde antes do incidente do Consumidor (causa nunca ident
 - RDR: 0 protocolos duplicados, 0 vazios — banco já estava limpo.
 - PROCON: 1 protocolo duplicado (`26.04.0155.001.00067-3`, ids 17522 e 20283, status idêntico), 1 registro extra removido. Backup em `backup-canais-criticos\PRE_LIMPEZA_DUP_PROCON_2026-07-29_00-05.json`. Total final: 3.153.
 - **Estado final pós-auditoria completa: RDR=1.308, PROCON=3.153, Consumidor=2.278 — zero duplicata em qualquer canal.**
+
+**Conferência de totais 01/01–30/06/2026 vs. planilha MOL de referência (03/08/2026):** usuário informou números de referência (BACEN 1.147, PROCON 2.568, Consumidor 1.952) pra bater com o banco. RDR e Consumidor bateram. PROCON no banco = 2.609 (41 a mais que a planilha `Downloads\MOLReport.csv`). Investigação linha a linha (diff de protocolos únicos, banco tem 41 que a planilha não tem, planilha não tem nenhum que falte no banco) achou 3 grupos, nenhum é duplicata/erro:
+- 20 registros inseridos no mesmo dia 03/08 (sessão concorrente na 2ª máquina), datas de abertura de janeiro legítimas.
+- 18 registros são **Procon Uberlândia** (ver formato próprio acima) — fonte que essa planilha específica não cobre.
+- 3 registros são casos antigos de 2025 (Procon SP Digital/Paraná) carregados em 26/05, fora do range que a planilha atual exportou.
+Conclusão: banco correto, planilha é só um snapshot parcial — sem ação de correção necessária.
 
 **Pendência em aberto:** alerta visual dos 10 dias úteis pra status "Em Análise Pelo Gestor/Fornecedor" (regra "No Aguardo") — combinado com o usuário, mas pausado pra investigar a nota antes. Ainda não implementado.
 
