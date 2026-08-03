@@ -1908,7 +1908,7 @@ async function salvarDia(){
         const upResp = await fetch(`${SB_URL}/rest/v1/canais_criticos_uploads`,{
           method:'POST',
           headers:{...H,'Prefer':'return=representation'},
-          body:JSON.stringify({canal,data_ref:dataRef,arquivo:stLocal[canal].fileName||'',total:rowsData.length})
+          body:JSON.stringify({canal,data_ref:dataRef,arquivo:stLocal[canal].fileName||'',total:rowsData.length,usuario:getSessao()?.nome||null})
         });
         if(!upResp.ok){
           const t=await upResp.text();
