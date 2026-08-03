@@ -168,6 +168,14 @@ App real agora exige login via **Supabase Auth** — sem login, `garantirSessao(
 - **Motivo de ter feito assim:** pedido do Salviano — login único (mesmo e-mail) mas cada senha identifica a pessoa, pra depois medir SLA por usuário. Usar contas reais do Supabase Auth (em vez de senha hardcoded no JS) evita expor as senhas no código-fonte da página.
 - **Expansão de acessos (30/07/2026):** validado o teste inicial com Oliveira/Zoghaib, adicionados mais 5 usuários ao longo do dia (Bovi, Aguilera, Castagni, Mellugo, depois Lima) + conta Auditoria no migração do domínio — total 8 contas ativas (Oliveira, Zoghaib, Bovi, Aguilera, Castagni, Mellugo, Auditoria, Lima). Pra abrir mais no futuro: criar conta real no Supabase Auth via Admin API (`POST /auth/v1/admin/users` com `service_role` key — `{"email":"canais.criticos+<nome>@inbursa.com","password":"<Sobrenome>","email_confirm":true}`) e adicionar em `CONTAS_LOGIN` no `index.html`. Validar com um teste de `grant_type=password` antes de dar como concluído.
 
+### Rastreamento de quem fez cada upload (03/08/2026)
+Antes: `canais_criticos_uploads` registrava data/hora/arquivo/total de cada lote inserido, mas **não guardava qual dos 8 logins fez o upload** — descoberto ao investigar 20 registros de PROCON com data de abertura antiga (jan-mar/2026) que apareceram no banco em 03/08 (upload legítimo do dia, arquivo `MOLReport (63).xls`, feito pelo fluxo normal do app — não foi script nem duplicata).
+
+- **Coluna nova:** `canais_criticos_uploads.usuario` (text, nullable — registros antigos ficam `NULL`, não dá pra saber retroativamente quem fez uploads anteriores a 03/08/2026).
+- **Gravação:** no ponto de `INSERT` em `canais_criticos_uploads` (dentro do loop de `salvarDia()`), o body agora inclui `usuario: getSessao()?.nome || null` — usa o nome já salvo na sessão de login, sem chamada extra.
+- **`backup.py` atualizado** — select de `uploads` agora inclui `usuario`, aparece na aba `uploads` do backup Excel.
+- **Não afeta `canais_criticos_demandas`** — o rastreamento é por lote de upload (tabela `uploads`), não por demanda individual. Pra saber quem inseriu um registro específico, seria preciso cruzar `data_ref`+`canal`+`upload_date` da demanda com a linha correspondente em `uploads`.
+
 ### RLS travado (29/07/2026) — fechando brecha de segurança
 Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `anon_full_access` (FOR ALL TO anon) — **qualquer pessoa com a anon key (visível dando "Ver código-fonte" na página) tinha leitura E escrita completa, incluindo CPF real de clientes**, sem precisar nem abrir o app.
 - Todas as policies antigas (anon_full_access + várias policies soltas duplicadas em `public`) foram **removidas**.
