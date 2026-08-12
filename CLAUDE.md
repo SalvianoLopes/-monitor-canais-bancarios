@@ -8,14 +8,31 @@
 - **Vercel project:** `prj_2poSdjHTJHipUJVRDALaPCkG6g7I` (canais-criticos)
 - **Supabase real:** `yaaoisqyxfqocrnlymjm` — credenciais em `C:\Users\Desktop\backup-canais-criticos\backup.py`
 
-## Deploy
+## Deploy — REGRA OBRIGATÓRIA (desde 12/08/2026)
+**NUNCA rode `vercel deploy --prod` sem antes commitar E pushar pro `origin/main`.**
+
+**Por quê:** em 08/08/2026 o painel "Registros por mês" (Visão Geral) foi publicado
+direto em produção via `vercel deploy` sem passar por commit — o deploy resultante
+(`dpl_G3zbBT3PTVDwxv5GC7MS7hHDRvcz`) não tem nenhuma metadata de git associada.
+Como nenhuma sessão futura (nem git log, nem memória) tinha como saber que aquele
+código existia, um deploy seguinte feito a partir do `git main` sobrescreveu a
+funcionalidade em produção sem ninguém perceber até o usuário notar que o gráfico
+tinha sumido. Recuperado em 12/08/2026 baixando o HTML da URL do deploy órfão
+(cada deploy do Vercel fica acessível na própria URL, mesmo depois de não ser mais
+a produção) e comparando com o commit anterior pra isolar o que faltava.
+
+**Use sempre `deploy.sh`** (na raiz do repo) em vez de chamar `vercel deploy` direto —
+ele recusa o deploy se houver qualquer mudança não commitada ou não pushada:
 ```
 cd C:\Users\Desktop\portfolio\canais-criticos
 git add index.html
 git commit -m "..."
 git push origin main
-vercel deploy --prod
+bash deploy.sh
 ```
+Se `deploy.sh` não existir na máquina/sessão atual (ex.: clone novo), primeiro
+confirme manualmente com `git status` (deve estar limpo) e `git log origin/main -1`
+vs `git log -1` (mesmo commit) antes de rodar `vercel deploy --prod` direto.
 
 ## Stack
 - HTML/CSS/JS puro — sem React, sem build
