@@ -63,8 +63,8 @@ Colunas relevantes: `id, canal, data_ref, numero, demandante, cpf, abertura, pra
 
 - `data_ref`: data de referência (YYYY-MM-DD) — usada para filtrar por dia no calendário
 - `numero`: protocolo/número do caso — chave para deduplicação
-- `demanda`: tipo/tag da demanda
-- `extra1`: no Consumidor = nota do consumidor (1-5); no PROCON = órgão Procon
+- `demanda`: tipo/tag da demanda — **no RDR, desde 12/08/2026, é sempre o assunto real da reclamação** (ver "Mapeamento RDR" abaixo). Antes disso, para uploads no formato Situação-only, `demanda` acabava guardando a Situação (duplicado de `status`) — corrigido retroativamente.
+- `extra1`: no Consumidor = nota do consumidor (1-5); no PROCON = órgão Procon; **no RDR, desde 12/08/2026 = Data da Captura** (formato BR, DD/MM/AAAA — mesmo padrão de `abertura`/`prazo`)
 - `extra2`: no Consumidor = nome fantasia; no PROCON = município
 - `prazo`: campo do banco (não usado para classificar vencido — regra de prazo foi removida)
 
@@ -85,6 +85,24 @@ Para inserir no banco sem duplicatas:
 3. Verificar `inserted_date` para rastrear o que foi inserido em cada sessão
 
 ## Mapeamento planilhas MOL → banco
+
+### RDR/BACEN — planilha oficial desde 12/08/2026 (`Consolidado Geral.xlsx`, aba `Consolidado`)
+Essa é a planilha que o usuário realmente sobe pro RDR. `normalizar('rdr')` em `index.html` lê só estas 7 colunas (com fallback pros nomes antigos, caso a planilha ainda não tenha sido renomeada):
+
+| Coluna da planilha | Nome antigo na planilha | Campo banco |
+|---|---|---|
+| Data da Captura | Disponibilização A | `extra1` (formato BR) |
+| Número | — | `numero` |
+| Data de Ciência | Disponibilização | `abertura` / `data_ref` |
+| Prazo | — | `prazo` |
+| Nome | — | `demandante` |
+| CPF/CNPJ | — | `cpf` |
+| Demanda | — | `demanda` |
+
+As demais colunas que aparecem na planilha (Status, Data do Contrato, ISPB, IF Solicitante, CNPJ, Corban) são **desconsideradas de propósito** — decisão do usuário, não usar pra nada no app.
+
+- **Data da Captura vs Data de Ciência:** são datas diferentes de propósito — captura é quando o BACEN registrou a reclamação (pode ser fim de semana), ciência é quando chega no Inbursa pra começar a tratar (base do prazo de 10 dias úteis). Confirmado pelo usuário que na totalidade da planilha essas duas datas costumam bater no mesmo dia — se um registro específico tiver `extra1` (captura) muito diferente de `abertura` (ciência), suspeitar de dado desatualizado em `abertura` vindo de upload antigo, não da planilha atual.
+- **CPF vem sem zero à esquerda em ~4% das linhas** (Excel converte a célula pra número e perde o zero). Sempre normalizar com `zfill(11)` antes de gravar/comparar.
 
 ### Consumidor (MOLReport com avaliação)
 | Coluna MOL | Campo banco |
@@ -118,7 +136,9 @@ Fonte MOL separada dos 3 formatos acima — não aparece nos exports `MOLReport`
 - **Como identificar um registro desse tipo:** `extra1 = 'Procon Uberlândia'` — não depender do formato do `numero` sozinho pra reconhecer.
 - **How to apply:** ao cruzar planilha MOL × banco por protocolo (auditoria de duplicata, conferência de totais etc.), sempre excluir/tratar à parte os registros com `extra1='Procon Uberlândia'` se a planilha de referência for um export `MOLReport` padrão — eles não vão bater porque vêm de outra fonte, não porque estão errados. Confirmado em auditoria de 03/08/2026 (ver abaixo).
 
-## Tags de assunto do RDR/BACEN em `extra1` (30/07/2026)
+## Tags de assunto do RDR/BACEN em `extra1` (30/07/2026) — SUPERADO em 12/08/2026
+**Esta seção é histórico.** Em 12/08/2026 os dados descritos aqui foram migrados: `demanda = extra1` nos 1.263 registros que tinham a tag guardada em `extra1`, depois `extra1` foi limpo e passou a guardar Data da Captura (ver "Mapeamento RDR/BACEN" acima). Hoje a tag de assunto vive direto em `demanda`, não mais em `extra1`. Mantido abaixo só pra entender a origem do dado.
+
 O formato usado pro RDR (ver "Formato Respondida/Não Respondida" abaixo) nunca trouxe uma coluna de assunto/categoria — só Situação (status). O usuário tinha uma planilha separada (`Consolidado Geral.xlsx`, aba `Consolidado`) com o export tradicional do MOL, que tem coluna `Demanda` = a tag de assunto de verdade (ex: "Cópia do contrato", "Desconhece refinanciamento - BP", "Extrato/DED").
 
 - **Campo usado:** `extra1` — estava livre pro canal RDR (só usado por Consumidor/PROCON pra outra coisa), então não precisou de coluna nova nem migração de schema.
@@ -199,6 +219,22 @@ Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `ano
 - Cada tabela agora tem **uma única policy**: `authenticated_full_access` — `FOR ALL TO authenticated USING (true) WITH CHECK (true)`.
 - Confirmado por teste: GET com só a anon key agora retorna `200 []` (RLS filtra tudo, não dá erro — é assim que Postgres RLS se comporta via PostgREST).
 - **`backup-canais-criticos\backup.py` foi atualizado** — antes usava só a anon key; agora faz login (`grant_type=password`, conta Oliveira) antes de puxar os dados, senão o backup automático (Task Scheduler, sem interação) pararia de funcionar. Testado manualmente após a mudança: 6.739 registros, ok.
+
+### 2026-08-12
+
+**Padronização dos campos do RDR/BACEN com a planilha real (ver "Mapeamento RDR/BACEN" acima):**
+- Antes: `demanda` no RDR guardava a Situação (duplicado de `status`), e o assunto real ficava escondido em `extra1` desde o cruzamento de 30/07 (ver seção acima, marcada como superada).
+- Migração de dados: backup em `canais_criticos_demandas_backup_20260812_rdr` (1.379 linhas) → `UPDATE demanda = extra1, extra1 = ''` nos 1.263 registros que tinham a tag → `demanda` agora é sempre o assunto real, `status` continua com a Situação intacta.
+- Código (`normalizar('rdr')` + `headsMap`/`fieldsMap` em `index.html`) reescrito pra ler só os 7 nomes de coluna da planilha `Consolidado Geral.xlsx`, com fallback pros nomes antigos até o usuário renomear os cabeçalhos na planilha (Disponibilização A → Data da Captura; Disponibilização → Data de Ciência).
+- **Backfill de Data da Captura** (`extra1`): cruzado por `numero` contra a aba `Consolidado`, 1.265 de 1.265 protocolos únicos bateram (100%), gravado em formato BR (DD/MM/AAAA, igual aos outros campos de data — o backfill inicial saiu em ISO por engano, corrigido em seguida com `to_char(to_date(...),'DD/MM/YYYY')`).
+- **Backfill de CPF**: mesmo cruzamento, coluna `CPF/CNPJ` → `cpf`. 1.257 protocolos com CPF na planilha, ~4% vieram sem zero à esquerda (Excel tratando a célula como número) — normalizado com `zfill(11)` antes de gravar. Resultado: CPF preenchido foi de 80 → 1.325 de 1.379 registros do RDR.
+- Os poucos registros que sobraram sem Data da Captura/CPF (~50-114, variando por campo) são protocolos recentes (agosto/2026) fora do período coberto por essa planilha específica — não é erro, é lacuna de cobertura temporal.
+
+**Incidente: painel "Registros por mês" perdido e recuperado.** Descoberto quando o usuário notou que o gráfico/lista por mês da Visão Geral tinha sumido depois do deploy da padronização do RDR acima.
+- Causa raiz: em 08/08/2026 esse painel (lista "Registros por mês" com filtro de canal, "Detalhe de um mês" e gráfico "Comparativo mensal por canal") foi publicado direto em produção via `vercel deploy`, sem nunca passar por commit/push — o deploy `dpl_G3zbBT3PTVDwxv5GC7MS7hHDRvcz` não tem metadata de git nenhuma (`meta: {}` na API do Vercel).
+- Como não tinha rastro em lugar nenhum (nem `git log`, nem memória), o deploy da padronização do RDR (feito a partir do `git main`, que nunca teve esse código) sobrescreveu a funcionalidade em produção sem ninguém perceber, até o usuário notar.
+- Recuperação: achado o deploy órfão pela API do Vercel (`list_deployments`, filtrando por data/hora — cada deploy fica acessível na própria URL mesmo depois de não ser mais produção), baixado o HTML exato daquele deploy (`web_fetch_vercel_url` na URL própria do deploy, contorna a proteção SSO), comparado (`diff`, depois de normalizar `\r\n`) contra o commit anterior (`3a83fd0`) pra isolar exatamente o que tinha sido adicionado (funções `renderRegistrosPorMes`, `popularFocoMes`, `renderFocoMes` + o card `pg-mes-chart`). Reaplicado no código atual e **agora commitado de verdade** (`d5b052a`).
+- **Prevenção:** ver seção "Deploy — REGRA OBRIGATÓRIA" no topo do arquivo + `deploy.sh` na raiz do repo, criados nesta mesma sessão como consequência direta desse incidente.
 
 ### 2026-07-30
 **Acesso configurado numa segunda máquina (notebook Q7info):**
