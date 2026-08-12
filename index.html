@@ -1143,12 +1143,12 @@ function buildCanalPanel(canal,rows,today,in3){
 
   // ── Colunas exatas de cada planilha ──────────────────────
   const headsMap = {
-    rdr:        ['Número','Colaborador','Nome','Data Captura','Data Cadastro','Disponibilização','Prazo','Situação','Respondido','Demanda','CPF'],
+    rdr:        ['Data da Captura','Número','Data de Ciência','Prazo','Nome','CPF/CNPJ','Demanda'],
     consumidor: ['Protocolo','Reclamante','CPF','Capturada em','Data abertura','Tag(s)','Situação','Tipo produto','Safra','Descrição'],
     procon:     ['Protocolo','Reclamante','CPF','Capturada em','Data Cadastro CIP','Prazo resp. CIP','Situação','Procon','Município','Reclamado','Colaborador','Protocolo Adm.'],
   };
   const fieldsMap = {
-    rdr:        ['numero','colaborador','demandante','abertura','extra2','extra1','prazo','status','descricao','demanda','cpf'],
+    rdr:        ['extra1','numero','abertura','prazo','demandante','cpf','demanda'],
     consumidor: ['numero','demandante','cpf','abertura','prazo','demanda','status','extra2','safra','descricao'],
     procon:     ['numero','demandante','cpf','abertura','_data_cip','prazo','status','extra1','extra2','_reclamado','colaborador','_proto_adm'],
   };
@@ -1612,39 +1612,39 @@ function toISO(v){
 function normalizar(canal, rows){
 
   /* ──────────────────────────────────────────────────────────
-     BACEN RDR — planilha padrão: BACEN_RDR_PADRAO_OK.xlsx
-     Aba: BACEN_RDR
-     Colunas: Número, Disponibilização, Prazo, Demandante,
-              CPF/CNPJ, Demanda, Status, Safra contrato,
-              ISPB, IF Solicitante, CNPJ, Corban
+     BACEN RDR — planilha padrão: Consolidado Geral.xlsx (aba Consolidado)
+     Colunas usadas (nomes exatos da planilha, padronizado 12/08/2026):
+       1. Data da Captura  (nome antigo na planilha: "Disponibilização A")
+       2. Número
+       3. Data de Ciência  (nome antigo na planilha: "Disponibilização")
+       4. Prazo
+       5. Nome
+       6. CPF/CNPJ
+       7. Demanda
+     Demais colunas da planilha (Status, Data do Contrato, ISPB,
+     IF Solicitante, CNPJ, Corban) são desconsideradas — não gravadas.
   ────────────────────────────────────────────────────────── */
   if(canal==='rdr') return rows.map(r=>({
     numero:      String(r['Número']||r['Numero']||'').trim(),
-    demandante:  String(r['Demandante']||r['Nome']||''),
+    demandante:  String(r['Nome']||''),
     cpf:         String(r['CPF/CNPJ']||r['CPF']||'').trim(),
-    abertura:    toBR(r['Disponibilização']||r['Disponibilizacao']||r['Data de captura']||''),
+    abertura:    toBR(r['Data de Ciência']||r['Disponibilização']||r['Disponibilizacao']||''),
     prazo:       toBR(r['Prazo']||''),
-    demanda:     (r['Demanda']&&r['Demanda']!==null&&String(r['Demanda']).toLowerCase()!=='none'&&String(r['Demanda']).trim()!=='')?String(r['Demanda']):(r['Situação']?String(r['Situação']):'Pendente: IF/AC'),
-    status:      String(r['Status']||r['Situação']||''),
-    safra:       (r['Safra contrato']&&String(r['Safra contrato']).toLowerCase()!=='none')?String(r['Safra contrato']):'',
-    _demandaVazia: (!r['Demanda']||String(r['Demanda']).toLowerCase()==='none'),
-    extra1:      String(r['IF Solicitante']||''),
-    extra2:      String(r['Corban']||''),
-    descricao:   String(r['Respondido na plataforma']||''),
-    colaborador: String(r['Colaborador responsável']||''),
+    demanda:     String(r['Demanda']||''),
+    status:      '',
+    safra:       '',
+    extra1:      toBR(r['Data da Captura']||r['Disponibilização A']||''),
+    extra2:      '',
+    descricao:   '',
+    colaborador: '',
     dados_raw:{
-      'Número':          String(r['Número']||''),
-      'Demandante':      String(r['Demandante']||r['Nome']||''),
-      'CPF/CNPJ':        String(r['CPF/CNPJ']||''),
-      'Disponibilização':toBR(r['Disponibilização']||r['Disponibilizacao']||''),
-      'Prazo':           toBR(r['Prazo']||''),
-      'Demanda':         String(r['Demanda']||''),
-      'Status':          String(r['Status']||''),
-      'Safra contrato':  String(r['Safra contrato']||''),
-      'ISPB':            String(r['ISPB']||''),
-      'IF Solicitante':  String(r['IF Solicitante']||''),
-      'CNPJ':            String(r['CNPJ']||''),
-      'Corban':          String(r['Corban']||''),
+      'Data da Captura':  toBR(r['Data da Captura']||r['Disponibilização A']||''),
+      'Número':           String(r['Número']||''),
+      'Data de Ciência':  toBR(r['Data de Ciência']||r['Disponibilização']||''),
+      'Prazo':            toBR(r['Prazo']||''),
+      'Nome':             String(r['Nome']||''),
+      'CPF/CNPJ':         String(r['CPF/CNPJ']||''),
+      'Demanda':          String(r['Demanda']||''),
     }
   }));
 
