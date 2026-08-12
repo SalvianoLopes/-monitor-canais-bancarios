@@ -87,7 +87,7 @@ Para inserir no banco sem duplicatas:
 ## Mapeamento planilhas MOL → banco
 
 ### RDR/BACEN — planilha oficial desde 12/08/2026 (`Consolidado Geral.xlsx`, aba `Consolidado`)
-Essa é a planilha que o usuário realmente sobe pro RDR. `normalizar('rdr')` em `index.html` lê só estas 7 colunas (com fallback pros nomes antigos, caso a planilha ainda não tenha sido renomeada):
+Essa é a planilha que o usuário realmente sobe pro RDR. `normalizar('rdr')` em `index.html` lê só estas 7 colunas — aceita tanto o nome novo quanto o antigo, porque **o usuário decidiu manter os cabeçalhos originais na planilha (confirmado 12/08/2026), não vai renomear nunca** — o fallback não é transitório, é permanente por design:
 
 | Coluna da planilha | Nome antigo na planilha | Campo banco |
 |---|---|---|
