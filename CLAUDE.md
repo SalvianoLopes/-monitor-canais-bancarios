@@ -301,6 +301,15 @@ Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `ano
 - **Resultado:** Consumidor foi de 2.461 → **2.486 registros** (25 novos). 27/05/2026 agora mostra corretamente **17 registros**, batendo com a planilha.
 - **Causa raiz não identificada** — o padrão "banco 1 dia à frente do real" em dezenas de registros espalhados pelo ano é consistente com algum bug de fuso horário (UTC vs. horário local) num script de carga histórica, mas não foi rastreado a um commit/script específico como no caso do PROCON (26/05). Se aparecer de novo em outro canal, vale investigar a causa raiz de verdade — por ora só os sintomas foram corrigidos.
 
+### REGRA — Prazo do RDR em reabertura/desdobramento de protocolo (decidido 13/08/2026)
+Discussão sobre o que acontece quando o mesmo protocolo de RDR reaparece numa planilha nova (reabertura/novo questionamento sobre o mesmo protocolo, dentro do prazo original ou depois dele).
+
+- **Regulação (BACEN, não CDC):** o CDC não define prazo numérico pra resposta bancária — só princípios gerais. O prazo de 10 dias úteis é regra operacional do próprio BACEN: RDR via Resolução BCB nº 222/2022; Ouvidoria via Resolução CMN/BCB 4.860/2020 (prazo pode ser prorrogado uma vez, por igual período, limitado a 10% das demandas do mês). Desdobramentos/reaberturas têm prazo de resposta próprio, controlado separadamente no RDR pelo próprio BACEN.
+- **Decisão de design (13/08/2026):** o app **não vai implementar lógica própria de prorrogação** (tipo "+10 dias úteis automático na reabertura"). Em vez disso, confia no `Prazo` que a planilha do BACEN já traz recalculado — é o mesmo princípio já usado desde a correção do `prazoEfetivo` (ver seção "Alerta visual de prazo REMOVIDO" acima): BACEN é a fonte da verdade pro prazo, não o app.
+- **Bug corrigido pra isso funcionar:** até este commit, quando um protocolo já existente reaparecia numa planilha nova, `salvarDia()` só atualizava `status` e `demanda` via PATCH — **`prazo` ficava travado no valor da primeira vez que o protocolo foi inserido**, mesmo que o BACEN já tivesse recalculado (reabertura estendendo o prazo, por exemplo). Corrigido: agora o PATCH também atualiza `prazo` quando ele vier preenchido na planilha nova.
+- **Efeito colateral corrigido junto:** o PATCH também sobrescrevia `demanda` mesmo quando a linha nova vinha com o campo vazio — se a mesma reclamação aparecesse depois numa planilha sem tag preenchida (formato de export inconsistente), apagava a tag boa que já estava salva. Corrigido: cada campo (`status`, `demanda`, `prazo`) só entra no PATCH se vier preenchido na linha nova — nunca sobrescreve um valor existente com vazio. Critério de "precisa atualizar" passou a considerar `demanda`/`prazo` novos também, não só mudança de `status`.
+- Commit `76da6a1`, deploy `dpl_HbuYabJNbSWaeCUKBTsrXfruiFfA`.
+
 ### 2026-08-12
 
 **Padronização dos campos do RDR/BACEN com a planilha real (ver "Mapeamento RDR/BACEN" acima):**
