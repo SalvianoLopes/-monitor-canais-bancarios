@@ -127,6 +127,15 @@ As demais colunas que aparecem na planilha (Status, Data do Contrato, ISPB, IF S
 **Tag PROCON:** extrair linha do "Banco Inbursa" da Situação, remover prefixo "Banco Inbursa - ".  
 **Sem situação:** usar "Aguardando Resposta" como padrão.
 
+### `data_cadastro_cip` (coluna 12, "Data Cadastro CIP") — REGRA desde 12/08/2026
+**Toda importação de PROCON tem que gravar a coluna "Data Cadastro CIP" da planilha no campo dedicado `data_cadastro_cip` da tabela.** Existe uma coluna própria no banco pra isso — nunca deixar esse dado só dentro de `dados_raw` (JSON) ou descartá-lo.
+
+**Por quê:** até 12/08/2026 o `normalizer('procon')` do `index.html` só guardava essa data dentro do `dados_raw`, nunca escrevia na coluna `data_cadastro_cip` — apesar da coluna existir na tabela desde antes. Resultado: **0 dos 3.518 registros de PROCON** tinham esse campo preenchido. Corrigido em duas frentes:
+1. Backfill retroativo: 728 registros que tinham `dados_raw` com a chave `'Data Cadastro CIP'` foram recuperados (`UPDATE ... SET data_cadastro_cip = dados_raw->>'Data Cadastro CIP'`). Os ~2.790 registros sem `dados_raw` **não têm como ser recuperados** — esse dado nunca foi capturado em lugar nenhum pra eles.
+2. Código (`normalizer('procon')` e o corpo do INSERT em `salvarDia()`) atualizado pra sempre gravar `data_cadastro_cip` na coluna própria a partir de agora, em qualquer upload feito pelo app.
+
+**How to apply:** se aparecer upload de PROCON feito fora do app (script avulso, como o `MOLReport.csv` inserido em 13/08/2026 — ver histórico abaixo), sempre incluir `data_cadastro_cip` no INSERT junto com os outros 15 campos padrão. Se for descoberto outro campo da planilha que a coluna do banco tem mas o app nunca preenche, aplicar o mesmo tratamento: corrigir o `normalizer()`, corrigir o INSERT de `salvarDia()`, e backfillar o que der pra recuperar via `dados_raw`.
+
 ### PROCON Uberlândia — 4º formato, protocolo próprio (achado 03/08/2026)
 Fonte MOL separada dos 3 formatos acima — não aparece nos exports `MOLReport` tradicionais (por isso planilhas desse tipo, ex. export de 01/01 a 30/06/2026, não trazem esses registros e uma comparação direta de contagem vai "sobrar" no banco sem ser duplicata/erro).
 
@@ -219,6 +228,12 @@ Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `ano
 - Cada tabela agora tem **uma única policy**: `authenticated_full_access` — `FOR ALL TO authenticated USING (true) WITH CHECK (true)`.
 - Confirmado por teste: GET com só a anon key agora retorna `200 []` (RLS filtra tudo, não dá erro — é assim que Postgres RLS se comporta via PostgREST).
 - **`backup-canais-criticos\backup.py` foi atualizado** — antes usava só a anon key; agora faz login (`grant_type=password`, conta Oliveira) antes de puxar os dados, senão o backup automático (Task Scheduler, sem interação) pararia de funcionar. Testado manualmente após a mudança: 6.739 registros, ok.
+
+### 2026-08-13
+
+**Upload de PROCON via `MOLReport.csv` (formato MOLReport 35, 15 cols) direto do Downloads, fora do app** — 191 registros novos (nenhum já existia no banco), cobrindo 06/08 a 13/08/2026. Inseridos por script (SQL direto via MCP), replicando fielmente a lógica de `normalizar('procon')`: Situação categorizada em "Aguardando Resposta"/"Em andamento" quando aplicável, ou mantida como veio. Upload registrado em `canais_criticos_uploads` (um registro por dia, usuario="Claude (script)").
+
+**Descoberta e correção do `data_cadastro_cip` faltando** — ver seção "`data_cadastro_cip` — REGRA" acima pro detalhe completo. Resumo: 0 de 3.518 registros de PROCON tinham essa coluna preenchida (bug do app, não só dos 191 novos); 919 recuperados (191 do CSV + 728 do `dados_raw`); código do app corrigido pra nunca mais faltar.
 
 ### 2026-08-12
 
