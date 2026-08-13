@@ -2029,16 +2029,21 @@ function addDiasUteis(base,n){
   while(added<n){d.setDate(d.getDate()+1);const dow=d.getDay();if(dow!==0&&dow!==6)added++;}
   return d;
 }
-/* Prazo visual — prioriza o Prazo REAL da planilha (r.prazo: BACEN no RDR, Prazo resp. CIP no PROCON;
-   já vem calculado corretamente pela fonte, inclusive descontando feriados nacionais).
-   Só cai pra estimativa própria (Data da Captura + 10 dias úteis, contando só fim de semana, sem feriado)
-   quando a planilha não trouxe Prazo — é o caso de boa parte do Consumidor.gov.br, que não tem esse campo.
-   Corrigido em 13/08/2026: antes recalculava sempre do zero e divergia da data real em ~38% dos RDR
-   (feriado como Sexta-feira Santa/Corpus Christi não é dia útil, mas nosso addDiasUteis não sabia disso).
+/* Prazo visual — prioriza o Prazo REAL da planilha só em RDR e PROCON (r.prazo: Prazo do BACEN /
+   Prazo resp. CIP; já vem calculado corretamente pela fonte, inclusive descontando feriados nacionais).
+   Consumidor.gov.br é sempre estimado (Data da Captura + 10 dias úteis) porque a exportação do MOL
+   NÃO traz um prazo de resposta de verdade pra esse canal — o campo `prazo` gravado no banco pra
+   Consumidor é só a "Data de abertura" duplicada (mesmo valor de `abertura`, não uma data futura),
+   herdado do normalizer('consumidor'). Usar `r.prazo` como deadline ali faria todo registro aberto
+   aparecer "Vencido" desde o primeiro dia — corrigido em 13/08/2026 antes de ir pro ar assim.
+   Corrigido também nesse mesmo dia: recalcular sempre do zero (sem olhar r.prazo) divergia da data
+   real em ~38% dos RDR, porque addDiasUteis só pula fim de semana, não feriado nacional.
    Só exibição — não sobrescreve nada no banco. */
 function prazoEfetivo(r){
-  const real = pd(r.prazo);
-  if(real) return real;
+  if(r.canal!=='consumidor'){
+    const real = pd(r.prazo);
+    if(real) return real;
+  }
   const base = r.canal==='rdr' ? (pd(r.extra1)||pd(r.abertura)) : (pd(r.data_ref)||pd(r.abertura));
   if(!base) return null;
   return addDiasUteis(base,10);
