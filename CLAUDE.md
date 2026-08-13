@@ -289,6 +289,11 @@ Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `ano
   | PROCON | `abertura` (planilha, 100%) | `data_cadastro_cip` (planilha, 99,9%) | `prazo` real da planilha ("Prazo resp. CIP"), 99,9%, já desconta feriado |
   | Consumidor.gov.br | `abertura` (planilha, 100%) | não se aplica (CIP é exclusivo do PROCON) | **não existe na planilha** — estimado no app como captura + 10 dias úteis (só fim de semana, sem feriado — aproximação, não é oficial) |
 
+**Alerta visual de prazo REMOVIDO (13/08/2026, mesmo dia, poucas horas depois de ir ao ar)** — pedido do usuário: badge "Vencido" visível pra diretoria antes de explicar que as respostas são dadas na MOL (não no app) ia gerar atrito desnecessário.
+- Removidos: banner vermelho/amarelo no topo do dia (`renderDiaDados`), coluna extra "Situação do prazo" com badge Vencido/Urgente/No prazo na tabela (`buildCanalPanel`), KPIs "Vencidas"/"No prazo" por canal (voltou a ser só "Encerradas"/"Em andamento"), seção "⏰ Prazos" no Painel Geral. Função `prazoEfetivo(r)` removida por completo (ficou sem nenhum uso).
+- **O que ficou:** a coluna "Prazo" que já vinha pronta da planilha (BACEN/PROCON, ver tabela acima) continua aparecendo normal na tabela de cada canal, sem cor/alarme — é só o dado bruto, do jeito que o usuário queria manter.
+- Se essa funcionalidade for pedida de volta no futuro, a lógica de cálculo (captura + 10 dias úteis, priorizando `prazo` real em RDR/PROCON) está preservada aqui no histórico do CLAUDE.md e no commit `1e799f6` (antes da remoção em `1bce25c`) — não precisa reinventar, só reaplicar com moderação (ex.: só visível pro usuário Oliveira, não pra todo login).
+
 ### 2026-08-12
 
 **Padronização dos campos do RDR/BACEN com a planilha real (ver "Mapeamento RDR/BACEN" acima):**
