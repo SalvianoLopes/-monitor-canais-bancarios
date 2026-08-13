@@ -271,6 +271,11 @@ Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `ano
 - **Onde aparece:** banner vermelho/amarelo no topo da view do dia (`renderDiaDados`) quando há vencidos/vencendo em 3 dias; nova coluna "Prazo (10 du captura)" com badge Vencido/Urgente/No prazo em cada tabela de canal (`buildCanalPanel`); KPIs "Vencidas"/"No prazo" no painel de cada canal; nova seção "⏰ Prazos" no topo do Painel Geral com totais gerais.
 - Commit `d01518e`, deploy `dpl_F1bDRyveGvJfLDJApxNo2CAydxEt` via `deploy.sh`.
 
+**Correção: `prazoEfetivo` não considerava feriado nacional (13/08/2026, mesmo dia)** — usuário reportou "datas de captura não estão refletindo no app". Investigado: `addDiasUteis()` só pula sábado/domingo, não feriado (Sexta-feira Santa, Corpus Christi etc.). Recalcular sempre do zero a partir da captura divergia da data real em **490 de 1.299 RDR (38%)** — comparado contra o `prazo` oficial que já vem pronto na própria planilha.
+- Achado importante: **RDR (100% preenchido) e PROCON (99,9%, só 4 de 3.503 sem) já trazem o Prazo certo pronto na planilha** — não tem porquê o app recalcular pra esses dois canais. Só Consumidor.gov.br não tem esse campo com frequência (841 de 2.461 sem `prazo`, ~34%).
+- **Fix:** `prazoEfetivo(r)` agora usa `r.prazo` (o valor real da planilha) quando ele existe, e só cai pra estimativa própria (captura + 10 dias úteis, sem feriado) quando a planilha não trouxe Prazo — normalmente só em Consumidor.
+- Coluna da tabela renomeada de "Prazo (10 du captura)" pra "Situação do prazo" (não é sempre um cálculo de captura, na maioria dos casos agora é o valor real). Commit `ac94029`, deploy `dpl_CqHBSCjEbpQ9UpyfoXwPrVsrkLVQ`.
+
 ### 2026-08-12
 
 **Padronização dos campos do RDR/BACEN com a planilha real (ver "Mapeamento RDR/BACEN" acima):**
