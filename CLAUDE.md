@@ -280,6 +280,15 @@ Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `ano
 - **Fix:** `prazoEfetivo(r)` agora usa `r.prazo` (o valor real da planilha) quando ele existe, e só cai pra estimativa própria (captura + 10 dias úteis, sem feriado) quando a planilha não trouxe Prazo — normalmente só em Consumidor.
 - Coluna da tabela renomeada de "Prazo (10 du captura)" pra "Situação do prazo" (não é sempre um cálculo de captura, na maioria dos casos agora é o valor real). Commit `ac94029`, deploy `dpl_CqHBSCjEbpQ9UpyfoXwPrVsrkLVQ`.
 
+**Correção: Consumidor.gov.br não tem Prazo de resposta real (13/08/2026, mesmo dia)** — usuário perguntou se as 3 datas (Captura, entrada na CIP, Prazo de resposta) estavam sendo consideradas certas nos 3 canais. Ao confirmar, achado que o fix anterior (usar `r.prazo` como deadline real) estava errado especificamente pro Consumidor: `normalizer('consumidor')` grava `prazo: toBR(r['Data de abertura']||'')` — **é a própria data de abertura duplicada, não um prazo de resposta.** A exportação do MOL não traz prazo de resposta pra esse canal (confirmado: 12 de 15 amostras aleatórias tinham `prazo` == `abertura`, dia idêntico). Com o fix anterior, isso fazia o alerta visual marcar praticamente todo registro aberto de Consumidor como "Vencido" desde o dia da captura.
+- **Fix:** `prazoEfetivo(r)` só usa `r.prazo` como deadline real pra `rdr` e `procon`. Consumidor sempre usa a estimativa (captura + 10 dias úteis). Commit `1e799f6`, deploy `dpl_DwZxeRazPBCgtWCbUer5rZp3MXiS`.
+- **Resumo final de como cada data é considerada, por canal (estado em 13/08/2026):**
+  | Canal | Data da Captura | Data entrada CIP | Prazo de resposta |
+  |---|---|---|---|
+  | RDR/BACEN | `extra1` (planilha, 100% preenchido) | não se aplica (CIP é conceito exclusivo do PROCON) | `prazo` real da planilha, 100% preenchido, já desconta feriado |
+  | PROCON | `abertura` (planilha, 100%) | `data_cadastro_cip` (planilha, 99,9%) | `prazo` real da planilha ("Prazo resp. CIP"), 99,9%, já desconta feriado |
+  | Consumidor.gov.br | `abertura` (planilha, 100%) | não se aplica (CIP é exclusivo do PROCON) | **não existe na planilha** — estimado no app como captura + 10 dias úteis (só fim de semana, sem feriado — aproximação, não é oficial) |
+
 ### 2026-08-12
 
 **Padronização dos campos do RDR/BACEN com a planilha real (ver "Mapeamento RDR/BACEN" acima):**
