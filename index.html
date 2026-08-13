@@ -1165,7 +1165,7 @@ function buildCanalPanel(canal,rows,today,in3){
     consumidor: ['numero','demandante','cpf','abertura','prazo','demanda','status','extra2','safra','descricao'],
     procon:     ['numero','demandante','cpf','abertura','_data_cip','prazo','status','extra1','extra2','_reclamado','colaborador','_proto_adm'],
   };
-  const heads  = [...(headsMap[canal]  || headsMap.consumidor), 'Prazo (10 du captura)'];
+  const heads  = [...(headsMap[canal]  || headsMap.consumidor), 'Situação do prazo'];
   const fields = [...(fieldsMap[canal] || fieldsMap.consumidor), '_prazo10'];
 
   // Campos especiais do PROCON que vêm do dados_raw
@@ -2029,10 +2029,16 @@ function addDiasUteis(base,n){
   while(added<n){d.setDate(d.getDate()+1);const dow=d.getDay();if(dow!==0&&dow!==6)added++;}
   return d;
 }
-/* Prazo visual = Data da Captura + 10 dias úteis, em todos os canais (regra decidida 13/08/2026).
-   RDR: extra1 = Data da Captura (fallback abertura). PROCON/Consumidor: data_ref/abertura = Capturada em.
-   Só exibição — não sobrescreve o campo "prazo" que vem da planilha. */
+/* Prazo visual — prioriza o Prazo REAL da planilha (r.prazo: BACEN no RDR, Prazo resp. CIP no PROCON;
+   já vem calculado corretamente pela fonte, inclusive descontando feriados nacionais).
+   Só cai pra estimativa própria (Data da Captura + 10 dias úteis, contando só fim de semana, sem feriado)
+   quando a planilha não trouxe Prazo — é o caso de boa parte do Consumidor.gov.br, que não tem esse campo.
+   Corrigido em 13/08/2026: antes recalculava sempre do zero e divergia da data real em ~38% dos RDR
+   (feriado como Sexta-feira Santa/Corpus Christi não é dia útil, mas nosso addDiasUteis não sabia disso).
+   Só exibição — não sobrescreve nada no banco. */
 function prazoEfetivo(r){
+  const real = pd(r.prazo);
+  if(real) return real;
   const base = r.canal==='rdr' ? (pd(r.extra1)||pd(r.abertura)) : (pd(r.data_ref)||pd(r.abertura));
   if(!base) return null;
   return addDiasUteis(base,10);
