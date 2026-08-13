@@ -1007,11 +1007,22 @@ function renderDiaDados(ds){
   const allRows=[...dia.rdr,...dia.consumidor,...dia.procon];
   const total=allRows.length;
 
+  let venc=0,urg=0;
+  allRows.forEach(r=>{
+    if(isEncerrado(r))return;
+    const p=prazoEfetivo(r);
+    if(!p)return;
+    p.setHours(0,0,0,0);
+    if(p<today)venc++;else if(p<=in3)urg++;
+  });
+
   const [y,m,d]=ds.split('-');
   const lbl=`${d}/${m}/${y}`;
 
   const area=document.getElementById('data-area');
   area.innerHTML=`
+    ${venc>0?`<div class="alert danger">⚠ ${venc} demanda(s) já passaram dos 10 dias úteis desde a captura, sem resposta.</div>`:''}
+    ${urg>0?`<div class="alert warn">⏰ ${urg} demanda(s) vencendo em até 3 dias.</div>`:''}
     <div class="kpi-row">
       <div class="kpi"><div class="kpi-lbl">Total do dia</div><div class="kpi-val" style="color:var(--ink)">${total}</div><div class="kpi-sub">${lbl}</div></div>
       <div class="kpi"><div class="kpi-lbl">RDR — BACEN</div><div class="kpi-val" style="color:#1a56db">${dia.rdr.length}</div><div class="kpi-sub">registros</div></div>
@@ -1122,12 +1133,14 @@ function buildCanalPanel(canal,rows,today,in3){
   const bannerLocal=temLocal?`<div style="background:#fffbeb;border:1px solid rgba(180,83,9,.2);border-radius:6px;padding:8px 12px;margin-bottom:10px;font-size:11px;font-weight:500;color:#b45309;display:flex;align-items:center;gap:6px;">⚠ Dados locais — clique em <strong>Salvar e publicar</strong> para confirmar</div>`:'';
 
   const demC={},stC={};
-  let enc=0;
+  let enc=0,venc=0,urg=0;
   rows.forEach(r=>{
     const dem=r.demanda||'—',st=r.status||'Sem status';
     demC[dem]=(demC[dem]||0)+1;
     stC[st]=(stC[st]||0)+1;
-    if(isEncerrado(r))enc++;
+    if(isEncerrado(r)){enc++;return;}
+    const p=prazoEfetivo(r);
+    if(p){p.setHours(0,0,0,0);if(p<today)venc++;else if(p<=in3)urg++;}
   });
 
   const topSt=Object.entries(stC).sort((a,b)=>b[1]-a[1]).slice(0,8);
@@ -1152,11 +1165,20 @@ function buildCanalPanel(canal,rows,today,in3){
     consumidor: ['numero','demandante','cpf','abertura','prazo','demanda','status','extra2','safra','descricao'],
     procon:     ['numero','demandante','cpf','abertura','_data_cip','prazo','status','extra1','extra2','_reclamado','colaborador','_proto_adm'],
   };
-  const heads  = headsMap[canal]  || headsMap.consumidor;
-  const fields = fieldsMap[canal] || fieldsMap.consumidor;
+  const heads  = [...(headsMap[canal]  || headsMap.consumidor), 'Prazo (10 du captura)'];
+  const fields = [...(fieldsMap[canal] || fieldsMap.consumidor), '_prazo10'];
 
   // Campos especiais do PROCON que vêm do dados_raw
   const getField=(r,f)=>{
+    if(f==='_prazo10'){
+      if(isEncerrado(r))return'<span style="color:var(--ink3);font-size:10px">— respondida</span>';
+      const p=prazoEfetivo(r);
+      if(!p)return'—';
+      p.setHours(0,0,0,0);
+      const cls=p<today?'v':p<=in3?'u':'o';
+      const lbl=cls==='v'?'Vencido':cls==='u'?'Urgente':'No prazo';
+      return`${fd(p)} <span class="badge ${cls}">${lbl}</span>`;
+    }
     if(f.startsWith('_')){
       const raw=r.dados_raw||{};
       if(f==='_data_cip')   return raw['Data Cadastro CIP']||'—';
@@ -1193,7 +1215,8 @@ function buildCanalPanel(canal,rows,today,in3){
     <div class="ckpi-row">
       <div class="kpi"><div class="kpi-lbl">Total</div><div class="kpi-val ${c.cls}">${rows.length}</div><div class="kpi-sub">no canal</div></div>
       <div class="kpi"><div class="kpi-lbl">Encerradas</div><div class="kpi-val ok">${enc}</div><div class="kpi-sub">finalizadas</div></div>
-      <div class="kpi"><div class="kpi-lbl">Em andamento</div><div class="kpi-val" style="color:var(--ink2)">${rows.length-enc}</div><div class="kpi-sub">abertas</div></div>
+      <div class="kpi"><div class="kpi-lbl">Vencidas</div><div class="kpi-val danger">${venc}</div><div class="kpi-sub">+10 dias úteis</div></div>
+      <div class="kpi"><div class="kpi-lbl">No prazo</div><div class="kpi-val" style="color:var(--ink2)">${rows.length-enc-venc}</div><div class="kpi-sub">abertas, dentro dos 10 du</div></div>
     </div>
     ${canal==='consumidor'?buildScoreConsumidor():''}
     <div class="cg2">
@@ -2006,7 +2029,14 @@ function addDiasUteis(base,n){
   while(added<n){d.setDate(d.getDate()+1);const dow=d.getDay();if(dow!==0&&dow!==6)added++;}
   return d;
 }
-function prazoEfetivo(r){ return null; }
+/* Prazo visual = Data da Captura + 10 dias úteis, em todos os canais (regra decidida 13/08/2026).
+   RDR: extra1 = Data da Captura (fallback abertura). PROCON/Consumidor: data_ref/abertura = Capturada em.
+   Só exibição — não sobrescreve o campo "prazo" que vem da planilha. */
+function prazoEfetivo(r){
+  const base = r.canal==='rdr' ? (pd(r.extra1)||pd(r.abertura)) : (pd(r.data_ref)||pd(r.abertura));
+  if(!base) return null;
+  return addDiasUteis(base,10);
+}
 
 let tt=null;
 function toast(msg,tipo='info'){
@@ -2108,7 +2138,41 @@ function renderPainelGeral(){
   const topDem=Object.entries(demC).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxD=topDem[0]?.[1]||1;
 
+  // Prazos (10 dias úteis desde a captura) — só visual, não altera dados
+  const hoje=new Date();hoje.setHours(0,0,0,0);
+  const em3=new Date(hoje);em3.setDate(em3.getDate()+3);
+  let pgVenc=0,pgUrg=0;
+  todasDemandas.forEach(d=>{
+    if(isEncerrado(d))return;
+    const p=prazoEfetivo(d);
+    if(!p)return;
+    p.setHours(0,0,0,0);
+    if(p<hoje)pgVenc++;else if(p<=em3)pgUrg++;
+  });
+
   content.innerHTML=`
+    <div class="pg-section">
+      <div class="pg-section-title">⏰ Prazos — 10 dias úteis desde a captura</div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+        <div style="background:var(--danger-bg);border-radius:var(--r);padding:12px 14px">
+          <div style="font-size:9px;font-weight:700;color:var(--danger);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Vencidas</div>
+          <div style="font-size:26px;font-weight:700;color:var(--danger);line-height:1">${pgVenc}</div>
+          <div style="font-size:10px;color:var(--ink3);margin-top:4px">sem resposta, +10 dias úteis</div>
+        </div>
+        <div style="background:var(--warn-bg);border-radius:var(--r);padding:12px 14px">
+          <div style="font-size:9px;font-weight:700;color:var(--warn);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Vencendo em 3 dias</div>
+          <div style="font-size:26px;font-weight:700;color:var(--warn);line-height:1">${pgUrg}</div>
+          <div style="font-size:10px;color:var(--ink3);margin-top:4px">atenção</div>
+        </div>
+        <div style="background:var(--ok-bg);border-radius:var(--r);padding:12px 14px">
+          <div style="font-size:9px;font-weight:700;color:var(--ok);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">No prazo / encerradas</div>
+          <div style="font-size:26px;font-weight:700;color:var(--ok);line-height:1">${total-pgVenc-pgUrg}</div>
+          <div style="font-size:10px;color:var(--ink3);margin-top:4px">sem urgência</div>
+        </div>
+      </div>
+      <div style="font-size:9px;color:var(--ink3);margin-top:8px">Visual apenas — não altera o campo Prazo importado da planilha. Uma demanda sai daqui automaticamente quando o status vier "respondida/encerrada/finalizada" em um próximo upload da MOL.</div>
+    </div>
+
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px">
       ${[['🏦 RDR — BACEN','#1a56db',tr,pRdr],['💬 Consumidor.gov.br','#0b7a5e',tc,pCon],['⚖️ PROCON','#7c3aed',tp,pPro]].map(([lbl,cor,qt,pct])=>`
         <div style="background:var(--paper);border-radius:var(--r);padding:12px 14px">
