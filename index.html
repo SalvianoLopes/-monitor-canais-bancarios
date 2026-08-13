@@ -1851,16 +1851,20 @@ async function salvarDia(){
       }
 
       // ── Separar novos de duplicatas ──
-      // Duplicata com status → PATCH; duplicata sem status → ignorar
+      // Duplicata com status, demanda/tag ou prazo novo → PATCH; sem nada disso → ignorar.
+      // PATCH nunca sobrescreve um campo já preenchido no banco com um valor vazio da planilha
+      // (ex.: reabertura de protocolo do RDR já traz Prazo recalculado pelo BACEN — decidido 13/08/2026).
       const novos=[], aAtualizar=[];
       rows.forEach(r=>{
         const num=String(r.numero||'').trim();
         const st=String(r.status||'').trim();
+        const dm=String(r.demanda||'').trim();
+        const pz=String(r.prazo||'').trim();
         if(!num)return;
         if(!existentesNo.has(num)){
           novos.push(r);
-        } else if(st&&st!=='—'){
-          aAtualizar.push({numero:num,status:st,demanda:String(r.demanda||'')});
+        } else if((st&&st!=='—')||(dm&&dm!=='—')||pz){
+          aAtualizar.push({numero:num,status:st,demanda:dm,prazo:pz});
         }
       });
 
@@ -1873,12 +1877,16 @@ async function salvarDia(){
         return true;
       });
 
-      // ── PATCH: atualizar status dos já existentes (respondidos/finalizados) ──
+      // ── PATCH: atualizar status/demanda/prazo dos já existentes, só os campos que vieram preenchidos ──
       for(const upd of aAtualizar){
+        const body={inserted_date:insertedDate};
+        if(upd.status&&upd.status!=='—')body.status=upd.status;
+        if(upd.demanda&&upd.demanda!=='—')body.demanda=upd.demanda;
+        if(upd.prazo)body.prazo=upd.prazo;
         await fetch(`${SB_URL}/rest/v1/canais_criticos_demandas?canal=eq.${canal}&numero=eq.${encodeURIComponent(upd.numero)}`,{
           method:'PATCH',
           headers:{...H,'Prefer':'return=minimal'},
-          body:JSON.stringify({status:upd.status,demanda:upd.demanda,inserted_date:insertedDate})
+          body:JSON.stringify(body)
         });
       }
       totalAtualizados+=aAtualizar.length;
