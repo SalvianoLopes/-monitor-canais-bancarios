@@ -235,6 +235,13 @@ Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `ano
 
 **Descoberta e correção do `data_cadastro_cip` faltando** — ver seção "`data_cadastro_cip` — REGRA" acima pro detalhe completo. Resumo: 0 de 3.518 registros de PROCON tinham essa coluna preenchida (bug do app, não só dos 191 novos); 919 recuperados (191 do CSV + 728 do `dados_raw`); código do app corrigido pra nunca mais faltar.
 
+**Segunda rodada de recuperação de `data_cadastro_cip`** — o usuário perguntou se não tinha mais fonte de dado disponível antes de aceitar a lacuna como definitiva. Busca mais ampla no disco achou:
+- `Downloads\Planilhas e Relatorios\MOLReport.csv` (31/07–05/08/2026, 119 protocolos) — 111 já tinham CIP vindo do `dados_raw`, **8 novos recuperados**.
+- `Downloads\MOLReport (1).csv` (jan–jul/2026, 450 linhas, 447 protocolos únicos) — cruzamento contra o banco: **412 já existiam** (326 sem CIP → recuperados, 86 já tinham), **35 eram novos** — todos protocolos **Procon Uberlândia** (formato `AAAA.MM.0399.NNN.NNNNN`, ver seção "PROCON Uberlândia" abaixo), inseridos com CIP já preenchido direto do arquivo.
+- Descartados como não aplicáveis: `MOLReport (1).csv` da pasta antiga (é formato Consumidor, sem coluna CIP), a cópia duplicada numa pasta de outra sessão (mesmo conteúdo do arquivo de 31/07–05/08), e o `Cópia de Tabulador Inbursa - Janeiro a Junho.xlsx` (114 MB — é log de atendimento SAC/formulário interno, não é export do MOL, não tem a coluna).
+- Confirmado por leitura do código-fonte: `backup.py` nunca selecionou `dados_raw` no SELECT, e `inserir_procon_padrao.py` (script histórico de 26/05) usava "Data Cadastro CIP" só como fallback de data e descartava o valor original sem gravar `dados_raw` — por isso registros inseridos por esse script específico não têm como recuperar esse campo (a planilha fonte, `PROCON_PADRAO_OK.xlsx`, não existe mais em nenhum lugar do disco).
+- **Resultado final desta sessão:** PROCON foi de **0 → 1.288 de 3.553** registros com `data_cadastro_cip` (total subiu de 3.518 para 3.553 com os 35 novos inseridos).
+
 ### 2026-08-12
 
 **Padronização dos campos do RDR/BACEN com a planilha real (ver "Mapeamento RDR/BACEN" acima):**
