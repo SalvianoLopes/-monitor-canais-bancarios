@@ -752,7 +752,7 @@ async function carregarDados(){
     if(!SB_URL || !SB_KEY) { carregarDadosMock(); return; }
     // Paginação: Supabase limita 1000 linhas por request
     // Busca em páginas de 1000 até trazer tudo
-    const SELECT = 'id,canal,data_ref,inserted_date,numero,demandante,cpf,abertura,prazo,demanda,status,safra,extra1,extra2,descricao,colaborador';
+    const SELECT = 'id,canal,data_ref,inserted_date,numero,demandante,cpf,abertura,prazo,demanda,status,safra,extra1,extra2,descricao,colaborador,data_cadastro_cip';
     let demandas = [];
     let offset = 0;
     const PAGE = 1000;
@@ -1181,7 +1181,7 @@ function buildCanalPanel(canal,rows,today,in3){
     }
     if(f.startsWith('_')){
       const raw=r.dados_raw||{};
-      if(f==='_data_cip')   return raw['Data Cadastro CIP']||'—';
+      if(f==='_data_cip')   return r.data_cadastro_cip || raw['Data Cadastro CIP'] || '—';
       if(f==='_reclamado')  return raw['Reclamado']||'—';
       if(f==='_proto_adm')  return raw['Protocolo Adm.']||'—';
       return '—';
