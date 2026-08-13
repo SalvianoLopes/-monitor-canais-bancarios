@@ -103,6 +103,7 @@ As demais colunas que aparecem na planilha (Status, Data do Contrato, ISPB, IF S
 
 - **Data da Captura vs Data de Ciência:** são datas diferentes de propósito — captura é quando o BACEN registrou a reclamação (pode ser fim de semana), ciência é quando chega no Inbursa pra começar a tratar (base do prazo de 10 dias úteis). Confirmado pelo usuário que na totalidade da planilha essas duas datas costumam bater no mesmo dia — se um registro específico tiver `extra1` (captura) muito diferente de `abertura` (ciência), suspeitar de dado desatualizado em `abertura` vindo de upload antigo, não da planilha atual.
 - **CPF vem sem zero à esquerda em ~4% das linhas** (Excel converte a célula pra número e perde o zero). Sempre normalizar com `zfill(11)` antes de gravar/comparar.
+- **REGRA — Prazo do RDR (confirmado 13/08/2026):** `Prazo` = `Data de Ciência` + **10 dias úteis**. É regra do próprio BACEN — a planilha já traz o valor calculado pronto na coluna "Prazo", o app **não calcula isso**, só armazena o que vem da planilha. Isso é só documentação do significado do campo, não uma lógica ativa: a classificação de vencido/urgente foi removida de propósito do app em 01/06/2026 (ver seção "Regra de prazo" abaixo) — todo registro aparece como OK, sem cálculo de vencimento.
 
 ### Consumidor (MOLReport com avaliação)
 | Coluna MOL | Campo banco |
