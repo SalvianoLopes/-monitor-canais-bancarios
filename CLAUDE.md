@@ -255,6 +255,16 @@ Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `ano
 - Backup em `canais_criticos_demandas_backup_20260813_dup_uberlandia` antes de apagar. Regra de resolução: manter a linha com `data_cadastro_cip` preenchido (ou, se as duas tinham CIP igual, manter a mais antiga por `inserted_date`); apagar a outra. **50 registros duplicados removidos.**
 - **Resultado final real da sessão: PROCON = 3.503 registros (não 3.553 — 50 eram duplicata), 3.500 com `data_cadastro_cip` (99,9%).** Restam só **3 registros** genuinamente sem cobertura em nenhuma planilha (protocolos `0743300/2025`, `0932117/2025`, `25.12.0039.001.05404-3`, todos inseridos em 26/05/2026 — provável script `restaurar_procon.py` ou `inserir_procon_padrao.py`, planilha fonte não existe mais no disco).
 
+**Quinta rodada — `abertura` (Capturada em) errada em 78 registros do restore de 26/05 (usuário viu no painel PROCON prazos que pareciam impossíveis: `abertura` depois de `data_cadastro_cip`/`prazo`):**
+- **Descoberta importante sobre o campo `abertura`:** ele nem sempre significa "quando a reclamação chegou" — em vários registros é o timestamp de quando rodou o **lote automático de captura**, podendo ser idêntico entre reclamações não relacionadas e bem distante no tempo do `data_cadastro_cip`/`prazo`. Isso **não é erro** na maioria dos casos, é característica normal do dado.
+- Comparado o `abertura` gravado no banco (dos 78 registros com gap suspeito, todos do restore de 26/05/2026) contra "Capturada em" do `MOLReport (2).csv` (mesmo arquivo grande da terceira rodada, protocolo a protocolo):
+  - **14 batiam certinho** — pareciam divergentes só por diferença de precisão (banco tinha segundos hardcoded manualmente na comparação, arquivo só tinha HH:MM) — falso positivo da própria checagem, não erro real.
+  - **29 tinham gap real mas correto** — `abertura` no banco bate com "Capturada em" do arquivo; o gap grande pra `data_cadastro_cip` é legítimo (lote de captura rodou bem depois da CIP).
+  - **35 estavam realmente errados** — `abertura` no banco não batia com "Capturada em" do arquivo-fonte. Causa raiz: bug do próprio script de restore de 26/05/2026 — **11 desses 35** tinham a mesma data errada fixa `01/05/2026` gravada, apesar de terem datas de captura reais e diferentes em janeiro/2026 conforme o arquivo-fonte (ex.: `26.01.0833.001.00023-3` devia ser `06/01/2026 01:48`, estava `01/05/2026`) — evidência clara de bug de escrita em lote, não dado real.
+- Backup em `canais_criticos_demandas_backup_20260813_abertura_errada` (35 linhas) antes da correção.
+- Corrigido via `UPDATE` cruzando pelos 35 `numero` contra o valor de "Capturada em" do arquivo-fonte, ajustando `abertura` e `data_ref` juntos. **35 registros corrigidos.**
+- Os outros 43 dos 78 originalmente sinalizados **não precisam de ação** — ou batem exatamente (só tinham diferença de precisão) ou o gap é real e inerente ao significado de "Capturada em" como timestamp de lote.
+
 ### 2026-08-12
 
 **Padronização dos campos do RDR/BACEN com a planilha real (ver "Mapeamento RDR/BACEN" acima):**
