@@ -240,7 +240,12 @@ Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `ano
 - `Downloads\MOLReport (1).csv` (jan–jul/2026, 450 linhas, 447 protocolos únicos) — cruzamento contra o banco: **412 já existiam** (326 sem CIP → recuperados, 86 já tinham), **35 eram novos** — todos protocolos **Procon Uberlândia** (formato `AAAA.MM.0399.NNN.NNNNN`, ver seção "PROCON Uberlândia" abaixo), inseridos com CIP já preenchido direto do arquivo.
 - Descartados como não aplicáveis: `MOLReport (1).csv` da pasta antiga (é formato Consumidor, sem coluna CIP), a cópia duplicada numa pasta de outra sessão (mesmo conteúdo do arquivo de 31/07–05/08), e o `Cópia de Tabulador Inbursa - Janeiro a Junho.xlsx` (114 MB — é log de atendimento SAC/formulário interno, não é export do MOL, não tem a coluna).
 - Confirmado por leitura do código-fonte: `backup.py` nunca selecionou `dados_raw` no SELECT, e `inserir_procon_padrao.py` (script histórico de 26/05) usava "Data Cadastro CIP" só como fallback de data e descartava o valor original sem gravar `dados_raw` — por isso registros inseridos por esse script específico não têm como recuperar esse campo (a planilha fonte, `PROCON_PADRAO_OK.xlsx`, não existe mais em nenhum lugar do disco).
-- **Resultado final desta sessão:** PROCON foi de **0 → 1.288 de 3.553** registros com `data_cadastro_cip` (total subiu de 3.518 para 3.553 com os 35 novos inseridos).
+- Resultado dessa rodada: PROCON foi de **0 → 1.288 de 3.553** registros com `data_cadastro_cip`.
+
+**Terceira rodada — arquivo `MOLReport (2).csv` (o "grande", jan–jul/2026, 3.136 linhas, 3.131 protocolos únicos):**
+- Carregado numa tabela de staging (`stage_procon_hoje`, criada e dropada na mesma sessão — MCP do Supabase não mantém sessão entre chamadas, então `TEMP TABLE` não persiste; usada tabela normal + `DROP TABLE` no final) em 11 lotes de ~300 linhas.
+- Cruzamento: **todos os 3.131 protocolos já existiam no banco** (zero novos pra inserir) — **2.215 estavam sem `data_cadastro_cip`**, preenchidos com um único `UPDATE ... FROM stage_procon_hoje`.
+- **Resultado final da sessão: PROCON foi de 0 → 3.503 de 3.553 registros com `data_cadastro_cip` (98,6%)**. Restam ~50 sem cobertura em nenhuma das 3 planilhas processadas hoje — provavelmente de uploads muito antigos (scripts de maio, ver `inserir_procon_padrao.py` acima) sem fonte recuperável no disco.
 
 ### 2026-08-12
 
