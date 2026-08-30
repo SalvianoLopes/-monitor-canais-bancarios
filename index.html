@@ -1331,7 +1331,7 @@ function carregarArquivo(canal,file){
       return out;
     });
     const norm=normalizar(canal,rows);
-    stLocal[canal]=stLocal[canal]?{...stLocal[canal],rows:[...stLocal[canal].rows,...norm]}:{rows:norm,fileName:file.name,sh};
+    stLocal[canal]={rows:norm,fileName:file.name,sh};
     const stId={rdr:'st-rdr',consumidor:'st-cons',procon:'st-proc',rdr_det:'st-rdr-det',cons_det:'st-cons-det'}[canal];
     const btnSel={rdr:'slot-rdr',consumidor:'slot-cons',procon:'slot-proc',rdr_det:'slot-rdr-det',cons_det:'slot-cons-det'}[canal];
     const stEl=document.getElementById(stId);
