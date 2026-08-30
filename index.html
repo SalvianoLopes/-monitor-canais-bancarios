@@ -1733,8 +1733,8 @@ function normalizar(canal, rows){
       dados_raw:{
         'Tags':                  String(r['Tags']||''),
         'Protocolo':             String(r['Protocolo']||''),
-        'Reclamante':            String(r['Reclamante']||''),
-        'CPF':                   String(r['CPF']||''),
+        'Reclamante':            String(r['Reclamante']||r['Nome do Consumidor']||'').trim(),
+        'CPF':                   String(r['CPF']||r['CPF do Consumidor']||'').trim(),
         'Data de abertura':      toBR(r['Data de abertura']||''),
         'Capturada em':          toBR(r['Capturada em']||''),
         'Situação':              String(r['Situação']||''),
