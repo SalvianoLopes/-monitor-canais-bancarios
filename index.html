@@ -1279,7 +1279,10 @@ function carregarArquivo(canal,file){
   if(!file)return;
   const reader=new FileReader();
   reader.onload=e=>{
-    const wb=XLSX.read(new Uint8Array(e.target.result),{type:'array',cellDates:true});
+    const data=new Uint8Array(e.target.result);
+    // Exports HTML da MOL (extensão .xls): raw:true evita que o parser converta datas dd/mm como mm/dd (americano)
+    const isHtml=String.fromCharCode.apply(null,Array.from(data.slice(0,64))).trimStart().charAt(0)==='<';
+    const wb=isHtml?XLSX.read(data,{type:'array',raw:true}):XLSX.read(data,{type:'array',cellDates:true});
     let sh=null;
     // Selecionar aba correta por canal
     // Padrão definitivo: BACEN_RDR → aba BACEN_RDR | Consumidor → aba Table | PROCON → aba PROCON
@@ -1657,7 +1660,7 @@ function normalizar(canal, rows){
       numero:      String(r['Número']||r['Numero']||'').trim(),
       demandante:  String(r['Nome']||''),
       cpf:         String(r['CPF/CNPJ']||r['CPF']||'').trim(),
-      abertura:    toBR(r['Data de Ciência']||r['Disponibilização']||r['Disponibilizacao']||''),
+      abertura:    toBR(r['Data de disponibilização']||r['Data de Ciência']||r['Disponibilização']||r['Disponibilizacao']||''),
       prazo:       toBR(r['Prazo']||''),
       demanda:     demandaFinal,
       status:      '',
@@ -1718,7 +1721,7 @@ function normalizar(canal, rows){
       numero:      String(r['Protocolo']||''),
       demandante:  String(r['Reclamante']||''),
       cpf:         String(r['CPF']||''),
-      abertura:    toBR(r['Capturada em']||r['Data de abertura']||''),
+      abertura:    toBR(r['Data de Abertura']||r['Data de abertura']||r['Capturada em']||''),
       prazo:       toBR(r['Data de abertura']||''),
       demanda:     demanda,
       status:      String(r['Situação']||''),
@@ -1788,7 +1791,7 @@ function normalizar(canal, rows){
       numero:      String(r['Protocolo']||''),
       demandante:  String(r['Reclamante']||''),
       cpf:         String(r['CPF']||''),
-      abertura:    toBR(r['Capturada em']||''),
+      abertura:    toBR(r['Data de captura']||r['Data de Captura']||r['Capturada em']||''),
       prazo:       toBR(r['Prazo de resposta CIP']||''),
       data_cadastro_cip: toBR(r['Data Cadastro CIP']||''),
       demanda:     demandaFinal,
