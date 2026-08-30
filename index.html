@@ -739,7 +739,7 @@ function isEncerrado(r){
 /* ══ PARSER DE CLASSIFICAÇÃO IA ══ */
 function parseClassificacaoIA(celula){
   if(!celula)return{produto:'',motivo:'',submotivo:''};
-  const texto=String(celula).trim();
+  const texto=String(celula).replace(/\s+/g,' ').trim();
   const result={produto:'',motivo:'',submotivo:''};
   const regex=/IA\s*-\s*(\w+)\s*:\s*(.*?)(?=IA\s*-|$)/gi;
   let match;
