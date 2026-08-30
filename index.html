@@ -1719,8 +1719,8 @@ function normalizar(canal, rows){
     }
     return {
       numero:      String(r['Protocolo']||''),
-      demandante:  String(r['Reclamante']||''),
-      cpf:         String(r['CPF']||''),
+      demandante:  String(r['Reclamante']||r['Nome do Consumidor']||'').trim(),
+      cpf:         String(r['CPF']||r['CPF do Consumidor']||'').trim(),
       abertura:    toBR(r['Data de Abertura']||r['Data de abertura']||r['Capturada em']||''),
       prazo:       toBR(r['Data de abertura']||''),
       demanda:     demanda,
