@@ -736,6 +736,31 @@ function isEncerrado(r){
          s.includes('cancelad') || s.includes('concluíd') || s.includes('concluido');
 }
 
+/* ══ PARSER DE CLASSIFICAÇÃO IA ══ */
+function parseClassificacaoIA(celula){
+  if(!celula)return{produto:'',motivo:'',submotivo:''};
+  const texto=String(celula).trim();
+  const result={produto:'',motivo:'',submotivo:''};
+  const regex=/IA\s*-\s*(\w+)\s*:\s*(.*?)(?=IA\s*-|$)/gi;
+  let match;
+  while((match=regex.exec(texto))!==null){
+    const chave=match[1].trim().toLowerCase();
+    const valor=match[2].trim();
+    if(chave==='produto')result.produto=valor;
+    else if(chave==='motivo')result.motivo=valor;
+    else if(chave==='submotivo')result.submotivo=valor;
+  }
+  return result;
+}
+
+function extrairClassificacao(parsed){
+  if(parsed.submotivo&&parsed.submotivo!=='-'&&parsed.submotivo.trim())
+    return parsed.submotivo.trim();
+  if(parsed.motivo&&parsed.motivo!=='-'&&parsed.motivo.trim())
+    return parsed.motivo.trim();
+  return '';
+}
+
 /* ══ INIT ══ */
 window.addEventListener('DOMContentLoaded',async()=>{
   if(_REAL){
@@ -1624,29 +1649,35 @@ function normalizar(canal, rows){
      Demais colunas da planilha (Status, Data do Contrato, ISPB,
      IF Solicitante, CNPJ, Corban) são desconsideradas — não gravadas.
   ────────────────────────────────────────────────────────── */
-  if(canal==='rdr') return rows.map(r=>({
-    numero:      String(r['Número']||r['Numero']||'').trim(),
-    demandante:  String(r['Nome']||''),
-    cpf:         String(r['CPF/CNPJ']||r['CPF']||'').trim(),
-    abertura:    toBR(r['Data de Ciência']||r['Disponibilização']||r['Disponibilizacao']||''),
-    prazo:       toBR(r['Prazo']||''),
-    demanda:     String(r['Demanda']||''),
-    status:      '',
-    safra:       '',
-    extra1:      toBR(r['Data da Captura']||r['Disponibilização A']||''),
-    extra2:      '',
-    descricao:   '',
-    colaborador: '',
-    dados_raw:{
-      'Data da Captura':  toBR(r['Data da Captura']||r['Disponibilização A']||''),
-      'Número':           String(r['Número']||''),
-      'Data de Ciência':  toBR(r['Data de Ciência']||r['Disponibilização']||''),
-      'Prazo':            toBR(r['Prazo']||''),
-      'Nome':             String(r['Nome']||''),
-      'CPF/CNPJ':         String(r['CPF/CNPJ']||''),
-      'Demanda':          String(r['Demanda']||''),
-    }
-  }));
+  if(canal==='rdr') return rows.map(r=>{
+    const classiaRaw=String(r['Classificação IA']||'');
+    const classiaFinal=classiaRaw?extrairClassificacao(parseClassificacaoIA(classiaRaw)):'';
+    const demandaFinal=classiaFinal||String(r['Demanda']||'');
+    return{
+      numero:      String(r['Número']||r['Numero']||'').trim(),
+      demandante:  String(r['Nome']||''),
+      cpf:         String(r['CPF/CNPJ']||r['CPF']||'').trim(),
+      abertura:    toBR(r['Data de Ciência']||r['Disponibilização']||r['Disponibilizacao']||''),
+      prazo:       toBR(r['Prazo']||''),
+      demanda:     demandaFinal,
+      status:      '',
+      safra:       '',
+      extra1:      toBR(r['Data da Captura']||r['Disponibilização A']||''),
+      extra2:      '',
+      descricao:   '',
+      colaborador: '',
+      dados_raw:{
+        'Data da Captura':  toBR(r['Data da Captura']||r['Disponibilização A']||''),
+        'Número':           String(r['Número']||''),
+        'Data de Ciência':  toBR(r['Data de Ciência']||r['Disponibilização']||''),
+        'Prazo':            toBR(r['Prazo']||''),
+        'Nome':             String(r['Nome']||''),
+        'CPF/CNPJ':         String(r['CPF/CNPJ']||''),
+        'Demanda':          String(r['Demanda']||''),
+        'Classificação IA': classiaRaw,
+      }
+    };
+  });
 
   /* ──────────────────────────────────────────────────────────
      BACEN DETALHES — arquivo complementar (slot separado)
@@ -1674,14 +1705,22 @@ function normalizar(canal, rows){
               Data de abertura, Capturada em
   ────────────────────────────────────────────────────────── */
   if(canal==='consumidor') return rows.map(r=>{
-    const tags = String(r['Tags']||'').split(';').map(t=>t.trim()).filter(Boolean).join(', ') || '—';
+    const classiaRaw=String(r['Classificação IA']||'');
+    const classiaFinal=classiaRaw?extrairClassificacao(parseClassificacaoIA(classiaRaw)):'';
+    let demanda;
+    if(classiaFinal){
+      demanda=classiaFinal;
+    }else{
+      const tags = String(r['Tags']||'').split(';').map(t=>t.trim()).filter(Boolean).join(', ') || '—';
+      demanda=tags;
+    }
     return {
       numero:      String(r['Protocolo']||''),
       demandante:  String(r['Reclamante']||''),
       cpf:         String(r['CPF']||''),
       abertura:    toBR(r['Capturada em']||r['Data de abertura']||''),
       prazo:       toBR(r['Data de abertura']||''),
-      demanda:     tags,
+      demanda:     demanda,
       status:      String(r['Situação']||''),
       safra:       '',
       extra1:      String(r['Colaborador responsável']||''),
@@ -1698,6 +1737,7 @@ function normalizar(canal, rows){
         'Situação':              String(r['Situação']||''),
         'Nome fantasia':         String(r['Nome fantasia']||''),
         'Colaborador responsável':String(r['Colaborador responsável']||''),
+        'Classificação IA':      classiaRaw,
       }
     };
   });
@@ -1736,11 +1776,14 @@ function normalizar(canal, rows){
               Prazo de resposta CIP, Protocolo Adm., Prazo proc. adm.
   ────────────────────────────────────────────────────────── */
   return rows.map(r=>{
+    const classiaRaw=String(r['Classificação IA']||'');
+    const classiaFinal=classiaRaw?extrairClassificacao(parseClassificacaoIA(classiaRaw)):'';
     const sit  = String(r['Situação']||'');
     const sit1 = sit.split('\n')[0].trim();
     const status = sit1.includes('Aguardando') ? 'Aguardando Resposta'
                  : sit1.includes('Em andamento') ? 'Em andamento'
                  : sit1 || '—';
+    const demandaFinal=classiaFinal||status;
     return {
       numero:      String(r['Protocolo']||''),
       demandante:  String(r['Reclamante']||''),
@@ -1748,7 +1791,7 @@ function normalizar(canal, rows){
       abertura:    toBR(r['Capturada em']||''),
       prazo:       toBR(r['Prazo de resposta CIP']||''),
       data_cadastro_cip: toBR(r['Data Cadastro CIP']||''),
-      demanda:     status,
+      demanda:     demandaFinal,
       status:      sit1 || '—',
       safra:       '',
       extra1:      String(r['Procon']||''),
@@ -1769,6 +1812,7 @@ function normalizar(canal, rows){
         'Prazo de resposta CIP':   toBR(r['Prazo de resposta CIP']||''),
         'Protocolo Adm.':          String(r['Protocolo Adm.']||'').replace("'-",''),
         'Prazo proc. adm.':        String(r['Prazo proc. adm.']||'').replace("'-",''),
+        'Classificação IA':        classiaRaw,
       }
     };
   });
