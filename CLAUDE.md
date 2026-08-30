@@ -63,10 +63,84 @@ Colunas relevantes: `id, canal, data_ref, numero, demandante, cpf, abertura, pra
 
 - `data_ref`: data de referência (YYYY-MM-DD) — usada para filtrar por dia no calendário
 - `numero`: protocolo/número do caso — chave para deduplicação
-- `demanda`: tipo/tag da demanda — **no RDR, desde 12/08/2026, é sempre o assunto real da reclamação** (ver "Mapeamento RDR" abaixo). Antes disso, para uploads no formato Situação-only, `demanda` acabava guardando a Situação (duplicado de `status`) — corrigido retroativamente.
+- `demanda`: tipo/tag da demanda — **no RDR, desde 12/08/2026, é sempre o assunto real da reclamação** (ver "Mapeamento RDR" abaixo). Antes disso, para uploads no formato Situação-only, `demanda` acabava guardando a Situação (duplicado de `status`) — corrigido retroativamente. **Desde 30/08/2026, quando a planilha traz a coluna "Classificação IA", ela tem prioridade sobre a regra abaixo, nos 3 canais** — ver seção "Estado técnico consolidado — 30/08/2026" logo adiante.
 - `extra1`: no Consumidor = nota do consumidor (1-5); no PROCON = órgão Procon; **no RDR, desde 12/08/2026 = Data da Captura** (formato BR, DD/MM/AAAA — mesmo padrão de `abertura`/`prazo`)
 - `extra2`: no Consumidor = nome fantasia; no PROCON = município
 - `prazo`: campo do banco (não usado para classificar vencido — regra de prazo foi removida)
+
+## Estado técnico consolidado — 30/08/2026 (LER PRIMEIRO)
+*Esta seção é a fonte de verdade atual. Detalhes de como se chegou até aqui estão na seção "### 2026-08-30" do log histórico, mais adiante.*
+
+### Classificação IA (novo campo dos exports MOL, todos os 3 canais)
+Os arquivos `.xls` (HTML) atuais da MOL podem trazer a coluna **"Classificação IA"**, formato:
+```
+IA - Produto: ...
+IA - Motivo: ...
+IA - Submotivo: ...
+```
+Regra pra preencher `demanda` (`parseClassificacaoIA()` + `extrairClassificacao()` em `index.html`):
+1. Submotivo válido (não vazio, não `-`) → usar Submotivo.
+2. Senão, Motivo válido → usar Motivo.
+3. Senão → fallback histórico do canal: RDR → coluna `Demanda`; Consumidor → `Tags`; PROCON → transformação da `Situação`.
+
+`Produto` é extraído mas nunca define `demanda`. O parser tolera quebras de linha vindas do HTML da MOL (`String(celula).replace(/\s+/g,' ').trim()` antes do regex — commit `36f7aee`, corrigindo bug em que só o último campo da célula era capturado). Validado: 164/164 classificações nos 3 arquivos reais de agosto (RDR 20, Consumidor 55, PROCON 89 — 78 via Submotivo + 86 via Motivo).
+
+### Leitura de arquivos MOL (.xls = HTML) — cuidado com datas
+Os `.xls` que a MOL exporta hoje são **HTML puro com extensão .xls**, não Excel binário. `carregarArquivo()` detecta isso pelo primeiro byte (`<`) e lê com `XLSX.read(data,{type:'array',raw:true})` — isso evita que o SheetJS inverta dia/mês em datas ambíguas (bug corrigido no commit `c718b83`: com `cellDates:true`, dia≤12 virava mês). Arquivos `.xlsx`/`.xlsb` reais continuam no caminho antigo (`cellDates:true`), sem mudança de comportamento. Validado: 4.145 células de data comparadas contra o HTML cru, zero divergências.
+
+### REGRA OFICIAL de `data_ref` — não alterar sem autorização explícita
+| Canal | `data_ref` = |
+|---|---|
+| RDR/BACEN | `Data de disponibilização` |
+| Consumidor.gov.br | `Data de abertura` / `Data de Abertura` |
+| PROCON | `Data de captura` / `Data de Captura` |
+
+`normalizar()` tem aliases pros nomes antigos (compatibilidade), mas prioriza sempre esses nomes quando presentes na planilha. **Nunca** deixar o dia selecionado na interface (`diaSel`) substituir a data real do arquivo — isso só é fallback de último caso, quando o campo realmente não existe/está vazio na linha.
+
+### Consumidor.gov.br — demandante/cpf/dados_raw (commits `24b8c5a` + `487d13b`)
+A MOL trocou `Reclamante`→`Nome do Consumidor` e `CPF`→`CPF do Consumidor` no export atual. Parser hoje, compatível com os dois formatos (prioridade ao nome antigo quando presente):
+```js
+demandante: String(r['Reclamante']||r['Nome do Consumidor']||'').trim(),
+cpf:        String(r['CPF']||r['CPF do Consumidor']||'').trim(),
+```
+O mesmo fallback também foi aplicado dentro de `dados_raw` (chaves continuam `'Reclamante'`/`'CPF'`, nenhuma chave nova) — **vale só para uploads a partir do commit `487d13b`**. Os 41 registros já corrigidos em 30/08 têm `demandante`/`cpf` funcionais certos, mas `dados_raw` histórico deles não foi retrofitado — decisão consciente, sem funcionalidade no app que leia `dados_raw` pra nome/CPF.
+
+### RDR — 7 protocolos de "reabertura" (preservar, não corrigir automaticamente)
+`data_ref` desses 7 marca a ENTRADA original (jun/jul/2026), mesmo a MOL mostrando `Data de disponibilização` de uma reabertura em agosto:
+
+| Número | data_ref preservado |
+|---|---|
+| 2026929781 | 26/06/2026 |
+| 2026954463 | 01/07/2026 |
+| 2026957172 | 02/07/2026 |
+| 2026960698 | 02/07/2026 |
+| 2026986220 | 07/07/2026 |
+| 20261000700 | 10/07/2026 |
+| 20261036586 | 16/07/2026 |
+
+### Prazo — fora de escopo operacional (reafirmado 30/08/2026)
+Consistente com a decisão de 13/08/2026 (ver "Alerta visual de prazo REMOVIDO" no log). O app **não gerencia prazo operacionalmente** — quem controla é a MOL. Referência conceitual: ~10 dias úteis a partir da data de referência do canal. **NÃO implementar** alertas, semáforos, contagem regressiva, bloqueios, mudança automática de status ou qualquer automação baseada em prazo sem pedido explícito. Não alterar o campo `prazo` sem solicitação explícita.
+
+### Estado da base após as correções de 30/08/2026 (baseline de validação)
+RDR: **1.459** · Consumidor: **2.689** · PROCON: **3.851** · **Total: 7.999** · Duplicados (canal+numero): **0**.
+
+### Commits da sessão de 30/08/2026 — produção atual = `487d13b`
+| Commit | O quê |
+|---|---|
+| `63cca49` | Implementa parser e lógica de Classificação IA |
+| `6931cd6` | Corrige reaproveitamento de dados em memória entre uploads (substituição, não concatenação) |
+| `36f7aee` | Parser de Classificação IA tolera quebras de linha do HTML da MOL |
+| `c718b83` | Leitura HTML com `raw:true` (fix dia/mês) + aliases das colunas novas de data |
+| `24b8c5a` | `demandante`/`cpf` do Consumidor reconhecem cabeçalhos novos da MOL |
+| `487d13b` | `dados_raw` do Consumidor preserva nome/CPF (só uploads futuros, sem backfill) |
+
+Deploy atual: `dpl_RcipCcsbAigAaeuKhzXJvqKWDLUF` (READY) → https://canais-criticos.vercel.app
+
+### Regras de segurança pra futuros backfills (metodologia validada nesta sessão)
+Antes de qualquer UPDATE em massa: 1) auditar por leitura; 2) gerar dry-run (CSV DE→PARA); 3) identificar registros exatos por protocolo+condição — nunca por critério amplo tipo "tudo numa data"; 4) criar backup (`CREATE TABLE ..._backup_YYYYMMDD_<nome> AS SELECT ...` + `ENABLE ROW LEVEL SECURITY`); 5) validar o estado atual de cada registro contra o "DE" do dry-run antes do PATCH — pular (nunca forçar) se divergir; 6) atualizar só as colunas autorizadas, por `id` exato; 7) validar pós-update; 8) comparar backup × atual coluna a coluna (prova de escopo); 9) confirmar totais gerais/por canal inalterados; 10) confirmar duplicados=0. Nunca presumir que uma coluna da MOL mudou de nome sem checar o arquivo real primeiro.
+
+### Pendência futura registrada (NÃO executar sem autorização)
+**Auditoria preventiva de RDR e PROCON** — mesma lógica já aplicada em datas e em demandante/cpf do Consumidor, ainda não feita para RDR/PROCON: verificar se existem outros campos funcionais ou de `dados_raw` desses dois canais ainda dependentes de nomes de coluna antigos da MOL (protocolo/número, reclamante/demandante, reclamado/fornecedor, situação/status, CPF/CNPJ, campos usados na interface). Quando for autorizada, começar **somente leitura**, com a mesma metodologia da seção acima.
 
 ## Indicador Consumidor.gov.br (reformulado 28/07/2026)
 **O score composto (Resolução 40% + Nota 40% + Respondidas 20%) foi removido.** Substituído por um indicador único: `buildScoreConsumidor()` agora mostra **"Satisfação (Consumidor.gov)"** = média simples das notas 1-5 dadas pelo consumidor (`soma(extra1) / count(extra1)`), a mesma fórmula que o Consumidor.gov.br usa de verdade (validado por pesquisa: [consumidor.gov.br](https://www.consumidor.gov.br/pages/conteudo/publico/1)).
@@ -235,6 +309,26 @@ Antes: `canais_criticos_demandas` e `canais_criticos_uploads` tinham policy `ano
 - Cada tabela agora tem **uma única policy**: `authenticated_full_access` — `FOR ALL TO authenticated USING (true) WITH CHECK (true)`.
 - Confirmado por teste: GET com só a anon key agora retorna `200 []` (RLS filtra tudo, não dá erro — é assim que Postgres RLS se comporta via PostgREST).
 - **`backup-canais-criticos\backup.py` foi atualizado** — antes usava só a anon key; agora faz login (`grant_type=password`, conta Oliveira) antes de puxar os dados, senão o backup automático (Task Scheduler, sem interação) pararia de funcionar. Testado manualmente após a mudança: 6.739 registros, ok.
+
+### 2026-08-30
+
+**Classificação IA implementada e corrigida** — nova coluna "Classificação IA" nos exports da MOL ("IA - Produto/Motivo/Submotivo"), regra Submotivo>Motivo>fallback do canal (ver "Estado técnico consolidado" acima). Parser inicial (commit `63cca49`) tinha bug de regex que não atravessava quebras de linha do HTML (`<br>`→`\n` pelo SheetJS) — só o último campo da célula (geralmente Submotivo) era capturado; quando vinha `Submotivo: -`, o Motivo já tinha se perdido e a classificação saía vazia. Corrigido no commit `36f7aee`. Validado 164/164 nos 3 arquivos reais de agosto.
+
+**Bug de reaproveitamento de memória entre uploads (commit `6931cd6`)** — ao carregar um segundo arquivo pro mesmo canal sem salvar antes, `stLocal[canal]` concatenava (`[...antigo, ...novo]`) em vez de substituir. Um teste com amostra de 3 linhas de Consumidor acabou reenviando os 365 registros do upload anterior inteiro (368 processados, deveriam ser só 3). Fix: `stLocal[canal] = {rows:norm, ...}` — substituição, não merge. 6 testes de regressão (concatenação nos 3 canais, zerar após salvar com sucesso, preservar em caso de falha, isolamento entre canais) todos validados.
+
+**Bug de leitura de datas (HTML MOL) — dia/mês invertido pelo SheetJS**, descoberto numa auditoria de datas depois do usuário notar que 28/08/2026 aparecia zerado no app apesar de ter registros na planilha. Causa dupla: (1) SheetJS com `cellDates:true` interpretava datas ambíguas (dia≤12) como formato americano; (2) a MOL renomeou as colunas de data (`Disponibilização`→`Data de disponibilização` etc.) e o parser não reconhecia os nomes novos, caindo no fallback do dia selecionado no calendário (`diaSel`). Fix commit `c718b83` (detecção de HTML + `raw:true`, aliases novos — ver seção "Estado técnico consolidado" acima). Validado com datas ambíguas (01/08, 02/08, 08/12, 12/08) e não ambíguas (13/08, 27/08, 28/08) — zero inversões, 4.145 células comparadas contra o HTML cru.
+
+**Backfill principal de datas** — 316 registros com `data_ref` incorreto por causa do fallback (todos com `inserted_date='2026-08-30'` e `data_ref='2026-08-19'`): RDR 14, Consumidor 41, PROCON 261. Backup `canais_criticos_demandas_backup_20260830_datas` (347 registros, RLS habilitado). Critério do backfill: protocolo existe na planilha E `data_ref` diverge da data correta da MOL — nunca "todo mundo que está em 19/08" (havia 31 registros legitimamente de 19/08, preservados). Zero erros, zero divergências. Só `data_ref`+`abertura` alterados — confirmado por JOIN backup×atual coluna a coluna (demanda/prazo/status/dados_raw/inserted_date/demandante/cpf: 0 mudanças).
+
+**Backfill histórico de datas** — auditoria adicional achou mais 61 registros com o mesmo padrão de fallback, originados de cargas anteriores (17/08 e 24/08): PROCON 60, Consumidor 1. Backup `canais_criticos_demandas_backup_20260830_historico` (61 registros). Zero erros, zero divergências, só `data_ref`+`abertura` alterados. Calendário validado após os dois backfills: 17/08=49, 18/08=47, 19/08=54, 21/08=41, 22/08=14, 23/08=2, 24/08=32, 25/08=59, 27/08=56, 28/08=39.
+
+**7 protocolos RDR de "reabertura" identificados e preservados fora de qualquer backfill** — ver lista na seção "Estado técnico consolidado" acima. `data_ref` desses 7 continua marcando a entrada original (jun/jul), não a data de disponibilização da reabertura em agosto — decisão intencional, não corrigir automaticamente no futuro.
+
+**Bug demandante/cpf do Consumidor.gov.br** — mesmo padrão do bug de datas: a MOL renomeou `Reclamante`→`Nome do Consumidor` e `CPF`→`CPF do Consumidor`; o parser antigo só reconhecia os nomes antigos. 41 registros do upload `id=1561` afetados (27/08: 24, 28/08: 16, 29/08: 1), todos com `demandante`/`cpf` vazios apesar do dado existir na MOL (confirmado: 40/40 protocolos localizados no arquivo original, todos com nome e CPF preenchidos). Fix commit `24b8c5a` (fallback compatível, prioridade ao nome antigo quando presente). Backfill: backup `canais_criticos_demandas_backup_20260830_demandante_cpf` (41 registros), 41/41 atualizados, zero erros/divergências, só `demandante`+`cpf` alterados.
+
+**Auditoria preventiva e fix do `dados_raw` do Consumidor** — mesmo após o fix acima, o objeto `dados_raw` (chaves `Reclamante`/`CPF`) continuava sem o fallback e perdia nome/CPF em 100% dos registros do formato novo (365/365 no arquivo real de agosto), apesar dos campos funcionais já corretos. Confirmado sem impacto operacional — busca em todo o `index.html` não achou nenhuma tela, filtro, busca ou exportação que leia `dados_raw['Reclamante']`/`['CPF']` (o único uso de `dados_raw` fora da montagem é no PROCON, pros campos `_data_cip`/`_reclamado`/`_proto_adm`). Fix preventivo commit `487d13b`, **só pra uploads futuros** — decisão consciente de não fazer backfill do `dados_raw` dos 41 registros históricos (o dado correto já está no campo funcional; sem justificativa técnica pra reescrever o raw).
+
+**Estado ao encerrar a sessão de 30/08/2026:** produção estável em `487d13b`; datas corrigidas (fluxo principal do código + 2 backfills); Classificação IA validada (164/164); demandante/CPF do Consumidor corrigidos (campo funcional + fix preventivo em `dados_raw`); base = RDR 1.459 + Consumidor 2.689 + PROCON 3.851 = **7.999**, duplicados = 0; prazo permanece fora de escopo operacional (decisão reafirmada); pendente auditoria preventiva de RDR/PROCON (ver "Estado técnico consolidado" acima) — não iniciar sem autorização explícita.
 
 ### 2026-08-13
 
